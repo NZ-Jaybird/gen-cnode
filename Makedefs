@@ -1,0 +1,23 @@
+CC=gcc
+CPP=g++
+CFLAGS= -g -Wall
+
+ARCH := $(shell uname -m | tr -s " ")
+KERNEL := $(shell uname -s | tr -s " ")
+
+ifeq ($(strip $(KERNEL)),Darwin)
+LDFLAGS := -Wall -fPIC -shared -flat_namespace -undefined suppress 
+else
+$(error $(KERNEL))
+LDFLAGS := -Wall -fPIC -shared -flat_namespace -undefined 
+endif
+
+ERL_ROOT = $(shell erl -noshell -eval 'io:format("~s~n", [code:root_dir()]), init:stop().')
+ifeq (,$(ERL_ROOT))
+$(error "Unable to locate erlang root directory! Is erlang installed?")
+endif
+
+#Search ERL_ROOT for erl_interface
+ERL_INTERFACE_ROOT = $(addprefix $(ERL_ROOT)/lib/, $(shell ls $(ERL_ROOT)/lib | grep erl_interface))
+ERL_INTERFACE_INCLUDE = $(ERL_INTERFACE_ROOT)/include
+ERL_INTERFACE_LIB = $(ERL_INTERFACE_ROOT)/lib
