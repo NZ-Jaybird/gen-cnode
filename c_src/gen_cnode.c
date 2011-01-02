@@ -156,11 +156,16 @@ int gen_cnode_init( gen_cnode_opts_t* opts, gen_cnode_state_t* state ){
 }
 
 void gen_cnode_exit( gen_cnode_state_t* state ){
-    //Wait for our conneciton pool to finish
-    g_thread_pool_free( state->callback_pool, TRUE, TRUE );
+  
+    if( !state ){
+        return;
+    }
 
+    if( state->callback_pool ){
+        //Wait for our conneciton pool to finish
+        g_thread_pool_free( state->callback_pool, TRUE, TRUE );
+    }
     
-
 }
 
 void gen_cnode_free_callback( gen_cnode_callback_t* callback ) {
@@ -246,7 +251,8 @@ int gen_cnode_handle_connection( gen_cnode_state_t* state ){
                 goto gen_cnode_handle_connection_exit;
             
             case ERL_TICK:
-                goto loop_bottom;
+                gen_cnode_emsg_destroy( &emsg );
+                continue;
 
             case ERL_ERROR:
                 rc = -num_bytes;
@@ -260,15 +266,18 @@ int gen_cnode_handle_connection( gen_cnode_state_t* state ){
         //If the message isn't a regular transmission, ignore it
         if( emsg.type != ERL_REG_SEND ){
             fprintf( stderr, "Received unsupported message type!\n" );
-            goto loop_bottom;
+            gen_cnode_emsg_destroy( &emsg );
+            continue;
         }
 
         //Attempt to convert message into a callback
         callback = g_new0( gen_cnode_callback_t, 1 );
         if( !gen_cnode_msg2cb( &emsg, callback ) ){
-            goto loop_bottom;
+            gen_cnode_emsg_destroy( &emsg );
+            continue;
         }
 
+        fprintf( stderr, "lib: %s, func: %s\n", callback->lib, callback->func );
         gen_cnode_emsg_destroy( &emsg );
 
         //<<HERE>> Better way to handle this?
@@ -278,10 +287,10 @@ int gen_cnode_handle_connection( gen_cnode_state_t* state ){
                 state->running = FALSE;
                 receiving = FALSE;
                 gen_cnode_free_callback( callback );
-                goto loop_bottom;
+                break;
         }
 
-        //Otherwise, push the request into the pool and get back to listening..
+        /*//Otherwise, push the request into the pool and get back to listening..
         g_thread_pool_push( state->callback_pool, (gpointer)callback, &error );
         if( error ){
             rc = -1;
@@ -289,8 +298,7 @@ int gen_cnode_handle_connection( gen_cnode_state_t* state ){
             break;
         } 
 
-        loop_bottom:
-            gen_cnode_emsg_destroy( &emsg );
+        */
     }  
    
     gen_cnode_handle_connection_exit: 
