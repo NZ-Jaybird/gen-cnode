@@ -1,6 +1,6 @@
 CC=gcc
 CPP=g++
-CFLAGS= -g -Wall
+CFLAGS= -O0 -g -Wall
 LDFLAGS=
 
 ARCH := $(shell uname -m | tr -s " ")
