@@ -2,9 +2,15 @@ include ../Makedefs
 
 LIB_TARGETS := libhello_world.so
 
-LCFLAGS += -I../include
-LCFLAGS += -I$(ERL_INTERFACE_INCLUDE)
-LCFLAGS += $(shell pkg-config --cflags glib-2.0)
+CFLAGS += -I../include
+CFLAGS += -I$(ERL_INTERFACE_INCLUDE)
+CFLAGS += $(shell pkg-config --cflags glib-2.0)
+
+ifeq ($(strip $(KERNEL)),Darwin)
+LDFLAGS := -Wall -fPIC -shared -flat_namespace -undefined suppress 
+else
+LDFLAGS := -Wall -fPIC -shared -flat_namespace -undefined 
+endif
 
 default: all ;
 
@@ -18,8 +24,8 @@ clobber: clean
 	rm -f $(LIB_TARGETS)
 
 %.o: %.c
-	$(CC) -c $(LCFLAGS) -o $@ $(CFLAGS) $<
+	$(CC) -c -o $@ $(CFLAGS) $<
 
-libhello_world.so: LCFLAGS += -fPIC
+libhello_world.so: CFLAGS += -fPIC
 libhello_world.so: libhello_world.o
 	$(CC) $(LDFLAGS) $^ $(LFLAGS) -o $@

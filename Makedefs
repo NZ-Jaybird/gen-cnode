@@ -1,16 +1,10 @@
 CC=gcc
 CPP=g++
 CFLAGS= -g -Wall
+LDFLAGS=
 
 ARCH := $(shell uname -m | tr -s " ")
 KERNEL := $(shell uname -s | tr -s " ")
-
-ifeq ($(strip $(KERNEL)),Darwin)
-LDFLAGS := -Wall -fPIC -shared -flat_namespace -undefined suppress 
-else
-$(error $(KERNEL))
-LDFLAGS := -Wall -fPIC -shared -flat_namespace -undefined 
-endif
 
 ERL_ROOT = $(shell erl -noshell -eval 'io:format("~s~n", [code:root_dir()]), init:stop().')
 ifeq (,$(ERL_ROOT))

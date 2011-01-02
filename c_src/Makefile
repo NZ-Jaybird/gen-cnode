@@ -4,10 +4,10 @@ include ../Makedefs
 BIN_TARGETS := gen_cnode 
 LIB_TARGETS := 
 
-LCFLAGS += -I../include
-LCFLAGS += -I$(ERL_INTERFACE_INCLUDE)
-LCFLAGS += $(shell pkg-config --cflags glib-2.0)
-LCFLAGS += $(shell pkg-config --cflags gthread-2.0)
+CFLAGS += -I../include
+CFLAGS += -I$(ERL_INTERFACE_INCLUDE)
+CFLAGS += $(shell pkg-config --cflags glib-2.0)
+CFLAGS += $(shell pkg-config --cflags gthread-2.0)
 
 LDFLAGS += -L$(ERL_INTERFACE_LIB) -lerl_interface -lei
 LDFLAGS += $(shell pkg-config --libs glib-2.0)
@@ -26,7 +26,7 @@ clobber: clean
 	rm -f $(BIN_TARGETS)
 
 %.o: %.c
-	$(CC) -c $(LCFLAGS) -o $@ $(CFLAGS) $<
+	$(CC) -c -o $@ $(CFLAGS) $<
 
 gen_cnode: gen_cnode_module.o gen_cnode_net.o gen_cnode_options.o gen_cnode.o
-	$(CC) $(LDFLAGS) $^ -o $@
+	$(CC) $^ $(LDFLAGS) -o $@
