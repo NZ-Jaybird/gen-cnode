@@ -15,14 +15,17 @@ typedef struct gen_cnode_lib_state_s * (*gen_cnode_state_new_fp) ();
 typedef int (*gen_cnode_init_fp) ( struct gen_cnode_lib_state_s *lib_state );
 typedef int (*gen_cnode_exit_fp) ();
 
-#define GEN_CNODE_LIB_STATE()                                               \
+#define GEN_CNODE_REQUIRE(LIBS)                                              \
+static char* GEN_CNODE_REQUIRED[] __attribute__ (( unused )) = {LIBS, NULL}
+
+#define GEN_CNODE_STATE()                                               \
 struct gen_cnode_lib_state_s                                                \
 
 #define GEN_CNODE_STATE_NEW()                                               \
-struct gen_cnode_lib_state_s* GEN_CNODE_LIB_STATE_NEW()                     \
+struct gen_cnode_lib_state_s* GEN_CNODE_STATE_NEW()                     \
 
-#define GEN_CNODE_LIB_STATE_FREE()                                          \
-void GEN_CNODE_LIB_STATE_FREE( struct gen_cnode_lib_state_s *lib_state )    \
+#define GEN_CNODE_STATE_FREE()                                          \
+void GEN_CNODE_STATE_FREE( struct gen_cnode_lib_state_s *lib_state )    \
 
 #define GEN_CNODE_DEFINE_INIT()                                             \
 int GEN_CNODE_INIT( struct gen_cnode_lib_state_s *state )                   \

@@ -4,7 +4,6 @@
 
 #include "gen_cnode.h"
 #include "gen_cnode_options.h"      //Command line options
-//#include "gen_cnode_msg.h"          //Internal message types
 #include "gen_cnode_net.h"          //Net utilities
 #include "gen_cnode_module.h"       //Module support
 
@@ -117,6 +116,11 @@ int gen_cnode_check_args( gen_cnode_opts_t* opts ){
                  "Try --help-all\n");
     }
 
+    if( opts->threads < 0 ){
+        rc = -EINVAL;
+        fprintf( stderr, "Number of worker threads must be non-zero!");
+    }
+
     check_args_exit:
     return rc;
 }
@@ -125,11 +129,6 @@ int gen_cnode_check_args( gen_cnode_opts_t* opts ){
 int gen_cnode_init( gen_cnode_opts_t* opts, gen_cnode_state_t* state ){
     int rc = 0;
 
-    //rc = gen_cnode_parse_options( state );
-
-    //Reqired by ei/erl_interface
-    //erl_init( NULL, 0 );
-
     //Setup GLIB threading
     if( !g_thread_supported() ){
         g_thread_init(NULL);
@@ -137,7 +136,7 @@ int gen_cnode_init( gen_cnode_opts_t* opts, gen_cnode_state_t* state ){
 
     //Setup connection pool
     state->callback_pool = g_thread_pool_new( (GFunc)gen_cnode_handle_callback,
-                                              state, 50, FALSE, FALSE );
+                                              state, opts->threads, FALSE, FALSE );
     if( !(state->callback_pool) ){
         rc = -1;
         fprintf( stderr, "g_thread_pool_new failed!\n" );
@@ -157,7 +156,7 @@ int gen_cnode_init( gen_cnode_opts_t* opts, gen_cnode_state_t* state ){
     }
 
     state->running = TRUE;
-    //state->modules = gen_cnode_module_init();
+    state->modules = gen_cnode_module_init();
 
     gen_cnode_init_exit:
     return rc;
@@ -211,15 +210,36 @@ bool gen_cnode_msg2cb( char* msg,
         goto msg2cb_exit;
     }
 
-    //Messages must be of the form { lib, func, [args] }.  
-    //Ensure arity of received tuple is 3.
+    //All messages must be of the form {pid, Callback}
+    //where pid is an erlang pid and Callback is a 3 arity
+    //tuple. 
     if( ei_decode_tuple_header(msg, &index, &arity) ){
         fprintf(stderr, "Failed to decode tuple! Msg must be a tuple!");
         isvalid = false;
         goto msg2cb_exit;
     }
 
-    //Messages must be of the form: {lib, func, [args]}
+    if( arity != 2 ){
+        fprintf(stderr, "Invalid tuple length! Got %d!\n", arity);
+        isvalid = false;
+        goto msg2cb_exit;
+    }
+
+    //Decode from pid
+    if( ei_decode_pid(msg, &index, &(callback->from)) ){
+        fprintf(stderr, "Failed to decode from pid!\n");
+        isvalid = false;
+        goto msg2cb_exit;
+    }
+
+    //Callbacks must be of the form { lib, func, [args] }.  
+    if( ei_decode_tuple_header(msg, &index, &arity) ){
+        fprintf(stderr, "Failed to decode tuple! Msg must be a tuple!");
+        isvalid = false;
+        goto msg2cb_exit;
+    }
+
+    //Ensure arity of received callback is 3.
     if( arity != 3 ){
         fprintf(stderr, "Invalid tuple length! Got %d!\n", arity);
         isvalid = false;
@@ -267,6 +287,7 @@ bool gen_cnode_msg2cb( char* msg,
 int gen_cnode_handle_connection( gen_cnode_state_t* state ){
     int rc = 0;
     bool receiving = TRUE;
+    GError* error = NULL;
 
     while( receiving ){
         guint32 num_bytes = 0;
@@ -334,18 +355,14 @@ int gen_cnode_handle_connection( gen_cnode_state_t* state ){
                 gen_cnode_free_callback( callback );
                 break;
         }
-
-        gen_cnode_free_callback(callback);
         
-        /*//Otherwise, push the request into the pool and get back to listening..
+        //Otherwise, push the request into the pool and get back to listening..
         g_thread_pool_push( state->callback_pool, (gpointer)callback, &error );
         if( error ){
             rc = -1;
             fprintf( stderr, "g_thread_push failed!\n");
             break;
         } 
-
-        */
     }  
    
     handle_connection_exit: 
@@ -356,8 +373,8 @@ int gen_cnode_handle_connection( gen_cnode_state_t* state ){
 /* erlang message helper function.  Probably should be broken up...*/
 void gen_cnode_handle_callback( gen_cnode_callback_t* callback, 
                                 gen_cnode_state_t* state ){
-    /*int rc = 0;
-    ETERM* resp = NULL;
+    int rc = 0;
+    ei_x_buff* resp = NULL;
 
     rc = gen_cnode_module_callback( callback, state->modules, &resp );
     if( rc ){
@@ -366,13 +383,15 @@ void gen_cnode_handle_callback( gen_cnode_callback_t* callback,
     }
 
     if( resp ){
-        
-        if( !(rc = erl_send( state->erl_fd, callback->from_pid, resp)) ){
-            printf( "erl_send failed!");    
-        } 
-        erl_free_term( resp );
+       
+        rc = ei_send( state->erl_fd, &(callback->from), resp->buff, resp->buffsz);
+        if( rc < 0 ){
+            fprintf( stderr, "ei_send failed!" );
+        }
+
+        ei_x_free(resp);
     }
-   */
+
     gen_cnode_handle_callback_exit: 
     gen_cnode_free_callback( callback );
 }

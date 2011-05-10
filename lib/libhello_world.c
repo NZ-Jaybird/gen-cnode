@@ -3,7 +3,7 @@
 
 #include "gen_cnode.h"
 
-typedef GEN_CNODE_LIB_STATE() {
+typedef GEN_CNODE_STATE() {
     int call_cnt;
 } hw_state_t;
 

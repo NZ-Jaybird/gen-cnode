@@ -219,9 +219,9 @@ gen_cnode_fp gen_cnode_module_lookup( gchar* lib,
 
 int gen_cnode_module_callback( gen_cnode_callback_t* callback,
                                GHashTable* modules,
-                               ETERM** resp ){
+                               ei_x_buff** resp ){
     int rc = 0;
-    gen_cnode_module_t* module = NULL;
+    /*gen_cnode_module_t* module = NULL;
     gchar* lib = callback->lib;
     gchar* func = callback->func;
     gen_cnode_fp fp = NULL;
@@ -243,7 +243,7 @@ int gen_cnode_module_callback( gen_cnode_callback_t* callback,
 
     rc = fp( callback->args, resp, module->state ); 
 
-    gen_cnode_module_callback_exit:
+    gen_cnode_module_callback_exit:*/
     return rc;
 }
 

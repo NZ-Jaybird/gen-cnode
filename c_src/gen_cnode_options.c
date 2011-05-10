@@ -2,9 +2,10 @@
 
 gen_cnode_opts_t gen_cnode_opts = { 
     .name = NULL,
-    .port = 0, 
-    .cookie = NULL,
-    .creation = 0 
+    .port = 0,
+    .threads = 1, 
+    .creation = 0,
+    .cookie = NULL
 };
 
 gchar gen_cnode_opt_sname[] = "gen_cnode common";
@@ -13,10 +14,8 @@ gchar gen_cnode_opt_shows[] = "Show gen_cnode common options";
 GOptionEntry gen_cnode_opt_entries[] = {
     GEN_CNODE_NAME,
     GEN_CNODE_PORT,
-    GEN_CNODE_COOKIE,
+    GEN_CNODE_THREADS,
     GEN_CNODE_CREATION,
+    GEN_CNODE_COOKIE,
     {NULL}
 };
-
-
-

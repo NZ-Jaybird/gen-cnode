@@ -6,6 +6,7 @@
 typedef struct gen_cnode_opts_s {
     gchar* name;            //(Require) Name associated with cnode
     guint16 port;           //(Required) Port on localhost on which to communicate
+    guint32 threads;        //(Optional) Numer of worker threads
     guint32 creation;       //(Optional) Numeric id of the node for short name mode.
     gchar* cookie;          //(Optional) Cookie used to decrypt/encrypt erlang messages
 } gen_cnode_opts_t;
@@ -26,6 +27,14 @@ extern gen_cnode_opts_t gen_cnode_opts;
         "Creation number used for ei_connect_init.",                \
         "<creation>"                                                \
     }                                                               \
+
+#define GEN_CNODE_THREADS                                           \
+    {                                                               \
+        "threads", 't', 0, G_OPTION_ARG_INT,                        \
+        &(gen_cnode_opts.threads),                                  \
+        "Number of worker threads for handling callbacks",          \
+        "<#threads>"                                                \
+    }     
 
 #define GEN_CNODE_NAME                                              \
     {                                                               \

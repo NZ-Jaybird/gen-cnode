@@ -18,6 +18,7 @@ typedef struct gen_cnode_module_entry_s {
 } gen_cnode_module_entry_t;
 
 typedef struct gen_cnode_callback_s {
+    erlang_pid from;                    //Pid making callback
     gchar lib  [MAXATOMLEN + 1];        //Library name
     gchar func [MAXATOMLEN + 1];        //Function name    
     gchar* argv;                        //Pointer to first element of argument list
@@ -36,7 +37,7 @@ gen_cnode_fp gen_cnode_module_lookup( gchar* lib,
 /* Performs proper lookups and calls the specified function (if it exists) */
 int gen_cnode_module_callback( gen_cnode_callback_t* callback,
                                GHashTable* modules, 
-                               ETERM** resp );
+                               ei_x_buff** resp );
 
 /* BIF which attempts to load the specified gen_cnode library */
 int gen_cnode_module_load( ETERM* args, ETERM** resp, GHashTable* modules );
