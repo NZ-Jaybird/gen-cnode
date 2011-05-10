@@ -6,6 +6,7 @@
 #define GEN_CNODE_NET_H
 
 #include <string.h>
+#include <glib.h>
 
 /* Networking bits */
 #include <sys/types.h>

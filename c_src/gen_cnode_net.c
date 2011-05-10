@@ -44,44 +44,58 @@ int gen_cnode_net_init( char* name,
                         char* secret,
                         uint32_t port,
                         uint16_t creation,
-                        gen_cnode_t* node){
+                        gen_cnode_t* state){
     int rc = 0;
+    const char* hostname = "localhost";
+    char* node = NULL;
 
-    if( !node || !name ){
+    if( !state || !name ){
         rc = -EINVAL;
         goto gen_cnode_net_init_exit;
     }
 
-    //<<HERE>> Setup the port on localhost
-    memset( &(node->addr), 0x00, sizeof(node->addr) );
-    node->addr.sin_family = AF_INET;
-    node->addr.sin_port = htons(port);
-    node->addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    //Setup networking info
+    memset( &(state->addr), 0x00, sizeof(state->addr) );
+    state->addr.sin_family = AF_INET;
+    state->addr.sin_port = htons(port);
+    state->addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
 
-    rc = gen_cnode_net_bind( node );
+    //Bind to localhost:port
+    rc = gen_cnode_net_bind( state );
     if( rc ){
         fprintf( stderr, "gen_cnode_net_bind failed! rc = %d\n", rc );
         goto gen_cnode_net_init_exit;
     }
 
-    rc = ei_connect_init( &(node->ec), name, secret, creation );
+    node = g_strdup_printf("%s@%s", name, hostname);
+
+    //Connect to erlang runtime 
+    rc = ei_connect_xinit( &(state->ec),
+                           hostname,
+                           name,
+                           node, 
+                           &(state->addr.sin_addr), 
+                           secret,
+                           creation );
     if( rc < 0 ){
-        fprintf( stderr, "ei_connect_init failed! rc = %d\n", rc );
+        fprintf(stderr, "ei_connect_xinit failed! rc = %d", errno);
         goto gen_cnode_net_init_exit;
-    }
+    } 
 
     //Publish our port to epmd ( assumes epmd is running! )
-    rc = ei_publish( &(node->ec), port );
+    rc = ei_publish( &(state->ec), port );
     if( rc < 0 ){
         fprintf( stderr, "ei_publish failed! rc = %d\n", rc );
         goto gen_cnode_net_init_exit;
     }
 
-    
-
     rc = 0;
 
     gen_cnode_net_init_exit:
+
+    if( node ){
+        g_free(node);
+    }
     return rc;
 }
 
