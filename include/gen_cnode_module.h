@@ -18,10 +18,11 @@ typedef struct gen_cnode_module_entry_s {
 } gen_cnode_module_entry_t;
 
 typedef struct gen_cnode_callback_s {
-    gchar* lib;     //Library name
-    gchar* func;     //Function name    
-    ETERM* args;     //Erlang-style args
-    ETERM* from_pid; //Who requested the callback
+    gchar lib  [MAXATOMLEN + 1];        //Library name
+    gchar func [MAXATOMLEN + 1];        //Function name    
+    gchar* argv;                        //Pointer to first element of argument list
+    guint32 argc;                       //Arity of argument list
+    gchar* msg;                         //Orginal message
 } gen_cnode_callback_t;
 
 /* Creates a hash table of gen_cnode_module_t and populates gen_cnode BIFS */
