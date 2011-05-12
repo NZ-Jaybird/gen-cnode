@@ -3,7 +3,7 @@
 
 #include "gen_cnode.h"
 
-GEN_CNODE_REQUIRE("foo");
+//GEN_CNODE_REQUIRE("foo","bar");
 
 typedef GEN_CNODE_STATE {
     int call_cnt;
@@ -27,6 +27,9 @@ GEN_CNODE_DEFINE_EXIT() {
 
 GEN_CNODE_DEFINE( hello_world ){
     printf( "Hello World!\n" );
-    *resp = erl_format("~s", "Hello World!");
+    
+    *resp = g_new0(ei_x_buff, 1);
+    ei_x_new(*resp);
+    ei_x_format(*resp, "~s", "Hello World!");
     return (int)0;
 }

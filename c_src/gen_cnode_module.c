@@ -1,3 +1,5 @@
+#include <string.h>
+
 #include "gen_cnode_module.h"
 
 typedef struct gen_cnode_bif_s {
@@ -51,7 +53,7 @@ GHashTable* gen_cnode_module_init(){
     return modules;
 }
 
-int gen_cnode_module_load_init( gen_cnode_module_t* module, ETERM** result ){
+int gen_cnode_module_load_init( gen_cnode_module_t* module ){
     int rc = 0;
     gboolean is_sym;
     gen_cnode_init_fp init_fp;
@@ -76,10 +78,6 @@ int gen_cnode_module_load_init( gen_cnode_module_t* module, ETERM** result ){
     
         //Call the init fuction and record the result    
         rc = init_fp( module->state );
-        if( rc < 0 ){
-            *result = erl_format( "{error, failed_to_initialize}" );
-            fprintf( stderr, "Library failed to initialize! rc = %d\n", rc );
-        }
     }
 
     return rc;
@@ -97,98 +95,144 @@ void gen_cnode_module_load_exit( gen_cnode_module_t* module ){
     }
 }
 
-void gen_cnode_module_load_internal( ETERM* args,
-                                     ETERM** results,
-                                     guint32 i,
-                                     GHashTable* modules){
+int gen_cnode_module_load_required( gen_cnode_module_t* module ){
     int rc = 0;
-    ETERM* lib_atom = NULL; 
-    gchar *lib_name = NULL, *fullname = NULL;
-    gen_cnode_module_t* module;
-    GModule* lib = NULL;
+    int i;
+    gboolean sym = FALSE;
+    const char* (*fp) (int) = NULL;
 
-    if( ERL_IS_EMPTY_LIST(args) ){
-        return;
-    } 
-
-    lib_atom = erl_hd( args );
-
-    if( !ERL_IS_ATOM(lib_atom) ){
-        results[i] = erl_format("{ error, bad_arg }");
+    if( !module || module->reqs ){
+        rc = -EINVAL;
+        goto load_required_exit;
     }
 
-    lib_name = ERL_ATOM_PTR( lib_atom );
+    sym = g_module_symbol( module->lib, 
+                           "GEN_CNODE_REQUIRED", 
+                           ((gpointer*)&fp) );
 
-    erl_free_term( lib_atom );
+    if( !sym ){
+        printf("DEBUG: No prereqs detected\n");     
+    } else {
 
-    //If the module already is loaded...skip to end
-    if( (module = g_hash_table_lookup(modules, lib_name)) ){
-        results[i] = erl_format( "{ok, already_loaded}" );
-        goto gen_cnode_module_load_recurse;
+        for( i=0; fp(i); i++ ){
+            GModule* lib = NULL;
+            char* fullname = NULL;
+
+            //Stitch together full filename based on LD_LIBRARY_PATH
+            fullname = g_module_build_path( NULL, fp(i) );
+
+            printf("DEBUG: Attempting to open %s...\n", fullname); 
+
+            //Attempt to load the module
+            lib = g_module_open( fullname, 0 );
+            if( !lib ){
+                rc = -EINVAL;
+                g_free(fullname);
+                goto load_required_exit; 
+            }
+
+            //Not intending on using this pointer as all symbols
+            //for the library are bound globally, but will store
+            //them for later removal should the module be unloaded.
+            module->reqs = g_list_append(module->reqs, lib);
+
+            g_free(fullname);
+        }
     }
 
-    //Stitch together full filename based on LD_LIBRARY_PATH
-    fullname = g_module_build_path( NULL, lib_name );
-
-    //Attempt to load the module
-    lib = g_module_open( fullname, G_MODULE_BIND_LAZY | G_MODULE_BIND_LOCAL );
-    if( !lib ){
-        results[i] = erl_format( "{error, failed_to_load}" );
-        fprintf( stderr, "Failed to load %s!\n", fullname );
-        goto gen_cnode_module_load_recurse;
-    }
-
-    //Create new module object for storage
-    module = g_new0( gen_cnode_module_t, 1 );
-    module->lib = lib;
-    module->funcs =  g_hash_table_new_full( g_str_hash, 
-                                            g_str_equal,
-                                            g_free,
-                                            NULL );
-    
-    //Attempt to initialize the module
-    rc = gen_cnode_module_load_init( module, results + i );
-    if( rc < 0 ){
-        gen_cnode_module_free( module );
-        goto gen_cnode_module_load_recurse;
-    }
-
-    gen_cnode_module_load_exit( module );
-
-    //Stash the module in the modules hash_table
-    g_hash_table_insert( modules, lib_name, module );
-    
-    fprintf( stdout, "Loaded %s...\n", fullname );
-
-    results[i] = erl_format( "{ok, ~a}", lib_name ); 
-
-    gen_cnode_module_load_recurse:
-    gen_cnode_module_load_internal( erl_tl(args), results, (i + 1), modules );
-
-    g_free( fullname );
+    load_required_exit:
+    return rc;
 }
 
 // {gen_cnode, load, lib_name}
-int gen_cnode_module_load( ETERM* args, 
-                           ETERM** resp, 
-                           GHashTable* modules ){
-    int length = erl_length( args );
-    ETERM** results = NULL;
- 
-    if( length <= 0 ){
-        goto gen_cnode_module_load_exit;
-    } 
+int gen_cnode_module_load( int argc,
+                           char* args, 
+                           GHashTable* modules,
+                           ei_x_buff** resp ){
 
-    results = g_new0( ETERM*, length );
+    int rc = 0;
+    int i, index;
+    char* lib_name = NULL;
+    gchar* fullname = NULL;
 
-    gen_cnode_module_load_internal( args, results, 0, modules );
+    if( !args || !argc || !modules || !resp ){
+        rc = -EINVAL;
+        goto load_exit;
+    }
 
-    *resp = erl_mk_list( results, length );
+    *resp = g_new0(ei_x_buff, 1); 
+    ei_x_new(*resp);
 
-    //<<HERE>> Do I need to free resp array?
+    for( i=0, index=0; i < argc; i++ ){
+        GModule *lib = NULL;
+        gen_cnode_module_t* module = NULL;
+        
+        lib_name = g_new0( char, 256 );
 
-    gen_cnode_module_load_exit:
-    return 0;
+        if( (rc = ei_decode_string(args, &index, lib_name)) ){
+            ei_x_format(*resp, "{~a,~a}", "error", "not_a_string");
+            goto load_exit;
+        }
+
+        //If the module already is loaded...skip to end
+        if( (module = g_hash_table_lookup(modules, lib_name)) ){
+            ei_x_format(*resp, "{~a,~a,~s}", 
+                        "error", "already_loaded", lib_name);
+            goto load_exit;;
+        }
+
+        //Stitch together full filename based on LD_LIBRARY_PATH
+        fullname = g_module_build_path( NULL, lib_name );
+
+        //Attempt to load the module
+        lib = g_module_open( fullname, (G_MODULE_BIND_LAZY | G_MODULE_BIND_LOCAL) );
+        if( !lib ){
+            ei_x_format(*resp, "{~a,~a,~s}", "error", "not_found", lib_name);
+            goto load_exit;
+        }
+
+        //Create new module object for storage
+        module = g_new0( gen_cnode_module_t, 1 );
+        module->lib = lib;
+        module->funcs =  g_hash_table_new_full( g_str_hash, 
+                                                g_str_equal,
+                                                g_free,
+                                                NULL );
+   
+        //Globally load module prereqs
+        if( (rc = gen_cnode_module_load_required(module)) ){
+            ei_x_format(*resp, "{~a,~a,~s}", 
+                        "error", "failed_to_load_required", fullname);
+            goto load_exit;
+        }
+
+        //Attempt to initialize the module
+        rc = gen_cnode_module_load_init( module );
+        if( rc < 0 ){
+            ei_x_format(*resp, "{~a,~a,~s}", 
+                        "error", "failed_to_init", fullname);
+            goto load_exit;
+        }
+
+        gen_cnode_module_load_exit( module );
+
+        //Stash the module in the modules hash_table
+        g_hash_table_insert( modules, lib_name, module );
+     
+        printf("DEBUG: loaded %s....\n", fullname);
+
+        g_free(fullname); fullname = NULL;
+    }
+
+    ei_x_format(*resp, "~a", "ok");
+
+    load_exit:
+
+    if( fullname ){
+        g_free(fullname);
+    }
+
+    return rc;
 }
 
 gen_cnode_fp gen_cnode_module_lookup( gchar* lib,
@@ -221,7 +265,7 @@ int gen_cnode_module_callback( gen_cnode_callback_t* callback,
                                GHashTable* modules,
                                ei_x_buff** resp ){
     int rc = 0;
-    /*gen_cnode_module_t* module = NULL;
+    gen_cnode_module_t* module = NULL;
     gchar* lib = callback->lib;
     gchar* func = callback->func;
     gen_cnode_fp fp = NULL;
@@ -231,19 +275,23 @@ int gen_cnode_module_callback( gen_cnode_callback_t* callback,
     }
 
     if( !(module = g_hash_table_lookup( modules, lib )) ){
-        *resp = erl_format( "{error, lib_not_loaded}" );
+        fprintf(stderr, "DEBUG: Library %s is not loaded!\n", lib);
+        *resp = g_new0(ei_x_buff, 1); ei_x_new(*resp);
+        ei_x_format( *resp, "{~a, ~a}", "error", "lib_not_loaded" );
         goto gen_cnode_module_callback_exit;
     } 
     
     fp = gen_cnode_module_lookup( lib, func, modules );
     if( !fp ){
-        *resp = erl_format( "{errror, {symbol_dne, ~a}}", func );
+        fprintf(stderr, "DEBUG: Function %s not defined in %s\n", func, lib);
+        *resp = g_new0(ei_x_buff, 1); ei_x_new(*resp);
+        ei_x_format( *resp, "{~a, ~a}", "error", "symbol_dne" );
         goto gen_cnode_module_callback_exit;
     }
 
-    rc = fp( callback->args, resp, module->state ); 
+    rc = fp( callback->argc, callback->argv, module->state, resp ); 
 
-    gen_cnode_module_callback_exit:*/
+    gen_cnode_module_callback_exit:
     return rc;
 }
 

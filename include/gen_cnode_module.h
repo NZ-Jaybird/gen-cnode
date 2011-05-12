@@ -9,6 +9,7 @@
 
 typedef struct gen_cnode_module_s {
     GModule* lib;
+    GList* reqs;
     GHashTable* funcs;
     struct gen_cnode_lib_state_s *state;
 } gen_cnode_module_t;
@@ -40,7 +41,7 @@ int gen_cnode_module_callback( gen_cnode_callback_t* callback,
                                ei_x_buff** resp );
 
 /* BIF which attempts to load the specified gen_cnode library */
-int gen_cnode_module_load( ETERM* args, ETERM** resp, GHashTable* modules );
+int gen_cnode_module_load( int argc, char* args, GHashTable* modules, ei_x_buff** resp );
 
 
 #endif

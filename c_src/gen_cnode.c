@@ -321,7 +321,7 @@ int gen_cnode_handle_connection( gen_cnode_state_t* state ){
             
             case ERL_ERROR:
                 rc = -num_bytes;
-                fprintf( stderr, "erl_receive_msg failed! rc = %d\n", rc );
+                fprintf( stderr, "ei_receive_msg failed! rc = %d\n", rc );
                 goto handle_connection_exit;
 
             default:
@@ -376,11 +376,7 @@ void gen_cnode_handle_callback( gen_cnode_callback_t* callback,
     int rc = 0;
     ei_x_buff* resp = NULL;
 
-    rc = gen_cnode_module_callback( callback, state->modules, &resp );
-    if( rc ){
-        fprintf( stderr, "gen_cnode_module_callback failed! rc = %d", rc );
-        goto gen_cnode_handle_callback_exit;
-    }
+    gen_cnode_module_callback( callback, state->modules, &resp );
 
     if( resp ){
        
@@ -392,6 +388,5 @@ void gen_cnode_handle_callback( gen_cnode_callback_t* callback,
         ei_x_free(resp);
     }
 
-    gen_cnode_handle_callback_exit: 
     gen_cnode_free_callback( callback );
 }
