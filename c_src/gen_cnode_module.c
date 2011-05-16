@@ -34,7 +34,7 @@ GHashTable* gen_cnode_module_init(){
                                      NULL );
 
     bifs = g_new0( gen_cnode_module_t, 1 );
-    bifs->state = (void*)modules;
+    bifs->state = (struct gen_cnode_lib_state_s *)modules;
     bifs->funcs = g_hash_table_new_full( g_str_hash,
                                          g_str_equal,
                                          g_free,
@@ -43,11 +43,11 @@ GHashTable* gen_cnode_module_init(){
     //Iterate through BIFs to build up gen_cnode module info
     for( i=0; gen_cnode_bifs[i]; i++ ){
          gen_cnode_bif_t* bif = gen_cnode_bifs[i];
-         g_hash_table_insert( bifs->funcs, bif->name, bif->fp );
+         g_hash_table_insert( bifs->funcs, bif->name, (void*)bif->fp );
     }
 
     //Add gen_cnode entry
-    g_hash_table_insert( modules, "gen_cnode", bifs );
+    g_hash_table_insert( modules, (void*)"gen_cnode", (void*)bifs );
 
     gen_cnode_module_open_exit:
     return modules;
@@ -74,7 +74,7 @@ int gen_cnode_module_load_init( gen_cnode_module_t* module ){
     if( is_sym && init_fp ){
         
         //Insert init_fp into our hashtable (Not really needed)
-        g_hash_table_insert( module->funcs, "GEN_CNODE_INIT", init_fp );
+        g_hash_table_insert( module->funcs, (void*)"GEN_CNODE_INIT", (void*)init_fp );
     
         //Call the init fuction and record the result    
         rc = init_fp( module->state );
@@ -91,7 +91,7 @@ void gen_cnode_module_load_exit( gen_cnode_module_t* module ){
     is_sym =  g_module_symbol( module->lib, "GEN_CNODE_EXIT", 
                                ((gpointer*)&exit_fp));
     if( is_sym && exit_fp ){
-        g_hash_table_insert( module->funcs, "GEN_CNODE_EXIT", exit_fp);
+        g_hash_table_insert( module->funcs, (void*)"GEN_CNODE_EXIT", (void*)exit_fp);
     }
 }
 
@@ -124,7 +124,7 @@ int gen_cnode_module_load_required( gen_cnode_module_t* module ){
             printf("DEBUG: Attempting to open %s...\n", fullname); 
 
             //Attempt to load the module
-            lib = g_module_open( fullname, 0 );
+            lib = g_module_open( fullname, (GModuleFlags)0 );
             if( !lib ){
                 rc = -EINVAL;
                 g_free(fullname);
@@ -175,7 +175,7 @@ int gen_cnode_module_load( int argc,
         }
 
         //If the module already is loaded...skip to end
-        if( (module = g_hash_table_lookup(modules, lib_name)) ){
+        if( (module = (gen_cnode_module_t*)g_hash_table_lookup(modules, lib_name)) ){
             ei_x_format(*resp, "{~a,~a,~s}", 
                         "error", "already_loaded", lib_name);
             goto load_exit;;
@@ -185,7 +185,7 @@ int gen_cnode_module_load( int argc,
         fullname = g_module_build_path( NULL, lib_name );
 
         //Attempt to load the module
-        lib = g_module_open( fullname, (G_MODULE_BIND_LAZY | G_MODULE_BIND_LOCAL) );
+        lib = g_module_open( fullname, (GModuleFlags)0);//(G_MODULE_BIND_LAZY | G_MODULE_BIND_LOCAL) );
         if( !lib ){
             ei_x_format(*resp, "{~a,~a,~s}", "error", "not_found", lib_name);
             goto load_exit;
@@ -241,17 +241,17 @@ gen_cnode_fp gen_cnode_module_lookup( gchar* lib,
     gen_cnode_module_t* module = NULL;
     gen_cnode_fp fp = NULL;
 
-    if( !(module = g_hash_table_lookup( modules, lib )) ){
+    if( !(module = (gen_cnode_module_t*)g_hash_table_lookup( modules, lib )) ){
         goto gen_cnode_module_lookup_exit;
     }
 
-    if( (fp = g_hash_table_lookup( module->funcs, func )) ){
+    if( (fp = (gen_cnode_fp)g_hash_table_lookup( module->funcs, func )) ){
         goto gen_cnode_module_lookup_exit;   
     }
 
     //Slow path: Find the symbol in the stashed GModule
     if( module->lib && g_module_symbol( module->lib, func, ((gpointer*)&fp) ) ){
-        g_hash_table_insert( module->funcs, g_strdup(func), fp );
+        g_hash_table_insert( module->funcs, g_strdup(func), (void*)fp );
         
         printf( "Added new func:%s in lib: %s! hash_size = %d\n", 
                 func, lib, g_hash_table_size( modules ) );
@@ -263,7 +263,7 @@ gen_cnode_fp gen_cnode_module_lookup( gchar* lib,
 
 int gen_cnode_module_callback( gen_cnode_callback_t* callback,
                                GHashTable* modules,
-                               ei_x_buff** resp ){
+                               ei_x_buff* resp ){
     int rc = 0;
     gen_cnode_module_t* module = NULL;
     gchar* lib = callback->lib;
@@ -274,18 +274,16 @@ int gen_cnode_module_callback( gen_cnode_callback_t* callback,
         goto gen_cnode_module_callback_exit;
     }
 
-    if( !(module = g_hash_table_lookup( modules, lib )) ){
+    if( !(module = (gen_cnode_module_t*)g_hash_table_lookup( modules, lib )) ){
         fprintf(stderr, "DEBUG: Library %s is not loaded!\n", lib);
-        *resp = g_new0(ei_x_buff, 1); ei_x_new(*resp);
-        ei_x_format( *resp, "{~a, ~a}", "error", "lib_not_loaded" );
+        ei_x_format( resp, "{~a, ~a}", "error", "lib_not_loaded" );
         goto gen_cnode_module_callback_exit;
     } 
     
     fp = gen_cnode_module_lookup( lib, func, modules );
     if( !fp ){
         fprintf(stderr, "DEBUG: Function %s not defined in %s\n", func, lib);
-        *resp = g_new0(ei_x_buff, 1); ei_x_new(*resp);
-        ei_x_format( *resp, "{~a, ~a}", "error", "symbol_dne" );
+        ei_x_format( resp, "{~a, ~a}", "error", "symbol_dne" );
         goto gen_cnode_module_callback_exit;
     }
 

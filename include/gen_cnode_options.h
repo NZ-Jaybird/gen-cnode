@@ -16,7 +16,7 @@ extern gen_cnode_opts_t gen_cnode_opts;
 /* CLA Specifications */
 #define GEN_CNODE_PORT                                              \
     {                                                               \
-        "port", 'P', 0, G_OPTION_ARG_INT, &(gen_cnode_opts.port),   \
+        "port", 'p', 0, G_OPTION_ARG_INT, &(gen_cnode_opts.port),   \
         "Port to use for IPC", "<port>"                             \
     }                                                               \
 
@@ -38,7 +38,7 @@ extern gen_cnode_opts_t gen_cnode_opts;
 
 #define GEN_CNODE_NAME                                              \
     {                                                               \
-        "name", 'N', 0, G_OPTION_ARG_STRING,                        \
+        "name", 'n', 0, G_OPTION_ARG_STRING,                        \
          &(gen_cnode_opts.name),                                    \
         "Long node name used to identify the cnode",                \
         "<node_name>"                                               \
@@ -46,7 +46,7 @@ extern gen_cnode_opts_t gen_cnode_opts;
 
 #define GEN_CNODE_COOKIE                                            \
     {                                                               \
-        "setcookie", 'S', 0, G_OPTION_ARG_STRING,                   \
+        "setcookie", 's', 0, G_OPTION_ARG_STRING,                   \
          &(gen_cnode_opts.cookie),                                  \
         "Secret used to encrypt/decrypt erlang messages",           \
         "<cookie>"                                                  \

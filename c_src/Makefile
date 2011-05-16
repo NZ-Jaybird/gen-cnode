@@ -8,6 +8,7 @@ CFLAGS += -I../include
 CFLAGS += -I$(ERL_INTERFACE_INCLUDE)
 CFLAGS += $(shell pkg-config --cflags glib-2.0)
 CFLAGS += $(shell pkg-config --cflags gthread-2.0)
+#CFLAGS += -Wc++-compat
 
 LDFLAGS += -L$(ERL_INTERFACE_LIB) -lerl_interface -lei
 LDFLAGS += $(shell pkg-config --libs glib-2.0)

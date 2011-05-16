@@ -28,8 +28,6 @@ GEN_CNODE_DEFINE_EXIT() {
 GEN_CNODE_DEFINE( hello_world ){
     printf( "Hello World!\n" );
     
-    *resp = g_new0(ei_x_buff, 1);
-    ei_x_new(*resp);
-    ei_x_format(*resp, "~s", "Hello World!");
+    ei_x_format(resp, "~s", "Hello World!");
     return (int)0;
 }

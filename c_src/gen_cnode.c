@@ -1,3 +1,5 @@
+//#include <iostream>
+
 #include <stdio.h>
 #include <stdbool.h>
 #include <glib.h>
@@ -35,6 +37,8 @@ int main( int argc, char** argv ){
     GOptionGroup *main_group = NULL;
     GOptionContext *main_context = NULL;
     GError *error = NULL;
+
+    //std::cout << "WORKS HERE!!!\n";
 
     //Define the option group
     main_group = g_option_group_new( gen_cnode_opt_sname, 
@@ -374,18 +378,20 @@ int gen_cnode_handle_connection( gen_cnode_state_t* state ){
 void gen_cnode_handle_callback( gen_cnode_callback_t* callback, 
                                 gen_cnode_state_t* state ){
     int rc = 0;
-    ei_x_buff* resp = NULL;
+    ei_x_buff resp = {NULL};
+
+    ei_x_new(&resp);
 
     gen_cnode_module_callback( callback, state->modules, &resp );
 
-    if( resp ){
-       
-        rc = ei_send( state->erl_fd, &(callback->from), resp->buff, resp->buffsz);
+    if( resp.index ){
+      
+        rc = ei_send( state->erl_fd, &(callback->from), resp.buff, resp.buffsz);
         if( rc < 0 ){
             fprintf( stderr, "ei_send failed!" );
         }
 
-        ei_x_free(resp);
+        ei_x_free(&resp);
     }
 
     gen_cnode_free_callback( callback );

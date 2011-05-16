@@ -38,7 +38,7 @@ gen_cnode_fp gen_cnode_module_lookup( gchar* lib,
 /* Performs proper lookups and calls the specified function (if it exists) */
 int gen_cnode_module_callback( gen_cnode_callback_t* callback,
                                GHashTable* modules, 
-                               ei_x_buff** resp );
+                               ei_x_buff* resp );
 
 /* BIF which attempts to load the specified gen_cnode library */
 int gen_cnode_module_load( int argc, char* args, GHashTable* modules, ei_x_buff** resp );
