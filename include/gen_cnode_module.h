@@ -41,7 +41,7 @@ int gen_cnode_module_callback( gen_cnode_callback_t* callback,
                                ei_x_buff* resp );
 
 /* BIF which attempts to load the specified gen_cnode library */
-int gen_cnode_module_load( int argc, char* args, GHashTable* modules, ei_x_buff** resp );
+int gen_cnode_module_load( int argc, char* args, GHashTable* modules, ei_x_buff* resp );
 
 
 #endif

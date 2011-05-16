@@ -148,7 +148,7 @@ int gen_cnode_module_load_required( gen_cnode_module_t* module ){
 int gen_cnode_module_load( int argc,
                            char* args, 
                            GHashTable* modules,
-                           ei_x_buff** resp ){
+                           ei_x_buff* resp ){
 
     int rc = 0;
     int i, index;
@@ -160,23 +160,20 @@ int gen_cnode_module_load( int argc,
         goto load_exit;
     }
 
-    *resp = g_new0(ei_x_buff, 1); 
-    ei_x_new(*resp);
-
     for( i=0, index=0; i < argc; i++ ){
         GModule *lib = NULL;
         gen_cnode_module_t* module = NULL;
         
         lib_name = g_new0( char, 256 );
 
-        if( (rc = ei_decode_string(args, &index, lib_name)) ){
-            ei_x_format(*resp, "{~a,~a}", "error", "not_a_string");
+        if( (rc = ei_decode_atom(args, &index, lib_name)) ){
+            ei_x_format(resp, "{~a,~a}", "error", "not_a_string");
             goto load_exit;
         }
 
         //If the module already is loaded...skip to end
         if( (module = (gen_cnode_module_t*)g_hash_table_lookup(modules, lib_name)) ){
-            ei_x_format(*resp, "{~a,~a,~s}", 
+            ei_x_format(resp, "{~a,~a,~s}", 
                         "error", "already_loaded", lib_name);
             goto load_exit;;
         }
@@ -187,7 +184,7 @@ int gen_cnode_module_load( int argc,
         //Attempt to load the module
         lib = g_module_open( fullname, (GModuleFlags)0);//(G_MODULE_BIND_LAZY | G_MODULE_BIND_LOCAL) );
         if( !lib ){
-            ei_x_format(*resp, "{~a,~a,~s}", "error", "not_found", lib_name);
+            ei_x_format(resp, "{~a,~a,~s}", "error", "not_found", lib_name);
             goto load_exit;
         }
 
@@ -201,7 +198,7 @@ int gen_cnode_module_load( int argc,
    
         //Globally load module prereqs
         if( (rc = gen_cnode_module_load_required(module)) ){
-            ei_x_format(*resp, "{~a,~a,~s}", 
+            ei_x_format(resp, "{~a,~a,~s}", 
                         "error", "failed_to_load_required", fullname);
             goto load_exit;
         }
@@ -209,7 +206,7 @@ int gen_cnode_module_load( int argc,
         //Attempt to initialize the module
         rc = gen_cnode_module_load_init( module );
         if( rc < 0 ){
-            ei_x_format(*resp, "{~a,~a,~s}", 
+            ei_x_format(resp, "{~a,~a,~s}", 
                         "error", "failed_to_init", fullname);
             goto load_exit;
         }
@@ -224,7 +221,7 @@ int gen_cnode_module_load( int argc,
         g_free(fullname); fullname = NULL;
     }
 
-    ei_x_format(*resp, "~a", "ok");
+    ei_x_format(resp, "~a", "ok");
 
     load_exit:
 
