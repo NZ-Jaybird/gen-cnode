@@ -390,9 +390,9 @@ void gen_cnode_handle_callback( gen_cnode_callback_t* callback,
         if( rc < 0 ){
             fprintf( stderr, "ei_send failed!" );
         }
-
-        ei_x_free(&resp);
     }
 
+    ei_x_free(&resp);
+    
     gen_cnode_free_callback( callback );
 }
