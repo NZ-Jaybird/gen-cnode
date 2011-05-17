@@ -2,7 +2,7 @@
 -behaviour(gen_server).
 
 %state of gen_cnode
--record( gen_cnode_state, {id, port, hostname, libs, cnode} ).
+-record( gen_cnode_state, {name, port, hostname, libs, cnode} ).
 
 %API functions
 
@@ -19,16 +19,15 @@
 start_link( Args ) when is_list(Args) ->
     gen_server:start_link({local, ?MODULE}, gen_cnode, Args, []).
 
-parse_arg( {libs, Libs}, #gen_cnode_state{id =I, port=P, libs=_L, cnode=_C} ) when is_list( Libs ) ->
-    #gen_cnode_state{ id=I, port=P, libs=Libs, cnode=_C };
+parse_arg( {libs, Libs}, State ) when is_list(Libs) ->
+    State#gen_cnode_state{ libs = Libs };
 
-parse_arg( {id, ID}, #gen_cnode_state{id =_I, port=P, libs=L} ) ->
-    {ok, Hostname} = inet:gethostname(),
-    Node = list_to_atom( lists:append( io_lib:format("c~p@", [ID] ), Hostname) ),
-    #gen_cnode_state{ id=ID, port=P, libs=L, cnode=Node };
+parse_arg( {name, Name}, State ) when is_atom(Name) ->
+    Node = list_to_atom( atom_to_list(Name) ++ "@localhost" ),
+    State#gen_cnode_state{ name=Name, cnode=Node };
 
-parse_arg( {port, Port}, #gen_cnode_state{id =I, port=_P, libs=L, cnode=_C} ) ->
-    #gen_cnode_state{ id=I, port=Port, libs=L, cnode=_C };
+parse_arg( {port, Port}, State ) when is_integer(Port) ->
+    State#gen_cnode_state{ port=Port };
 
 parse_arg( Unknown, State ) when is_tuple( Unknown ) -> State.
 
@@ -39,8 +38,8 @@ parse_args( [H | T], State ) when is_tuple(H) ->
 
 %%Build up gen_cnode command based on state
 exec_gen_cnode( State ) when is_record( State, gen_cnode_state ) ->
-    Command = io_lib:format( "gen_cnode -I ~p -P ~p -S ~s", 
-                                [   State#gen_cnode_state.id, 
+    Command = io_lib:format( "gen_cnode -n ~s -p ~w -s ~s", 
+                                [   State#gen_cnode_state.name, 
                                     State#gen_cnode_state.port, 
                                     erlang:get_cookie() ] ),  
     error_logger:info_msg("Calling: ~s~n", [ Command ]),
@@ -48,25 +47,29 @@ exec_gen_cnode( State ) when is_record( State, gen_cnode_state ) ->
 
 %% Parse args and exec gen_cnode binary
 init( Args ) ->
-    {ok, Hostname} = inet:gethostname(),
-    Node = list_to_atom( lists:append( "c0@", Hostname) ),
-    State = parse_args( Args, #gen_cnode_state{ id=0, 
-                                                port=40000, 
-                                                hostname=Hostname, 
+    State = parse_args( Args, #gen_cnode_state{ name='c0', 
+                                                port=30000, 
                                                 libs=[], 
-                                                cnode=Node } ),
+                                                cnode='c0@localhost' } ),
     
     %%Start gen_cnode binary
     spawn( fun() -> exec_gen_cnode( State ) end ),
-   
-    %%Shutdown gen_cnode binary an exit
+
+    %%Shutdown gen_cnode binary on exit
     process_flag( trap_exit, true ),
+
+    %%register ourselves under State.name
+    %%unregister(State#gen_cnode_state.name),
+    unregister(gen_cnode),
+    true = register(State#gen_cnode_state.name, self()),
+
+    error_logger:info_msg("registered: ~p~n", [registered()]),
 
     { ok, State }.
 
 %% Signal gen_cnode process to load the specified library
 handle_call( {load, Libs}, _From, State ) when is_list( Libs ) ->
-    {any, State#gen_cnode_state.cnode} ! { call, self(), {gen_cnode, load, Libs} },
+    {any, State#gen_cnode_state.cnode} ! { self(), {gen_cnode, load, Libs} },
 
     receive
         Reply ->
@@ -77,11 +80,13 @@ handle_call( {load, Libs}, _From, State ) when is_list( Libs ) ->
 handle_call( {Lib, Func, Args}, _From, State ) when is_atom(Lib)  and 
                                                     is_atom(Func) and 
                                                     is_list(Args) ->
-    
-    {any, State#gen_cnode_state.cnode} ! { call, self(), {Lib, Func, Args} },
+
+    {any, State#gen_cnode_state.cnode} ! { self(), {Lib, Func, Args} },
 
     receive
         Reply ->
+            error_logger:info_msg("Response for callback: ~p~n", [Reply]),
+
             {reply, Reply, State}
     end;
 
@@ -93,6 +98,6 @@ handle_info( _Info, State) -> {noreply, State}.
 
 %% Signal gen_cnode process to halt
 terminate(_Reason, State) -> 
-    {any, State#gen_cnode_state.cnode} ! { call, self(), {gen_cnode, stop, []} }.
+    {any, State#gen_cnode_state.cnode} ! { self(), {gen_cnode, stop, []} }.
 
 code_change(_OldVsn, State, _Extra ) -> {ok, State}.

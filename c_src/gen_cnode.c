@@ -38,8 +38,6 @@ int main( int argc, char** argv ){
     GOptionContext *main_context = NULL;
     GError *error = NULL;
 
-    //std::cout << "WORKS HERE!!!\n";
-
     //Define the option group
     main_group = g_option_group_new( gen_cnode_opt_sname, 
                                      gen_cnode_opt_lname, 
@@ -59,7 +57,7 @@ int main( int argc, char** argv ){
     g_option_context_parse( main_context, &argc, &argv, &error );
     if( error ){
         rc = -1;
-        fprintf( stderr, "Failed to parse CLAs!\n" );
+        fprintf( stderr, "%s\n", error->message );
         goto main_exit;
     }
 
@@ -365,6 +363,7 @@ int gen_cnode_handle_connection( gen_cnode_state_t* state ){
         if( error ){
             rc = -1;
             fprintf( stderr, "g_thread_push failed!\n");
+            fprintf( stderr, "%s\n", error->message);
             break;
         } 
     }  
