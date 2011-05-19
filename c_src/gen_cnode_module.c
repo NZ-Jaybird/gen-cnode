@@ -2,25 +2,14 @@
 
 #include "gen_cnode_module.h"
 
-typedef struct gen_cnode_bif_s {
-    gchar* name;
-    gen_cnode_fp fp;
-} gen_cnode_bif_t;
-
-static gen_cnode_bif_t* gen_cnode_bifs[] = {
-    &(gen_cnode_bif_t){ "load", (gen_cnode_fp)gen_cnode_module_load },
-    NULL 
-};
-
 //<<HERE>> Fix me
 void gen_cnode_module_free( gen_cnode_module_t* module ){
     g_hash_table_destroy( module->funcs );
 }
 
 GHashTable* gen_cnode_module_init(){
-    int i;
     GHashTable* modules = NULL;
-    gen_cnode_module_t* bifs = NULL;
+    //gen_cnode_module_t* bifs = NULL;
     
 
     if( !g_module_supported() ){
@@ -33,7 +22,7 @@ GHashTable* gen_cnode_module_init(){
                                      g_free,
                                      NULL );
 
-    bifs = g_new0( gen_cnode_module_t, 1 );
+    /*bifs = g_new0( gen_cnode_module_t, 1 );
     bifs->state = (struct gen_cnode_lib_state_s *)modules;
     bifs->funcs = g_hash_table_new_full( g_str_hash,
                                          g_str_equal,
@@ -47,7 +36,7 @@ GHashTable* gen_cnode_module_init(){
     }
 
     //Add gen_cnode entry
-    g_hash_table_insert( modules, (void*)"gen_cnode", (void*)bifs );
+    g_hash_table_insert( modules, (void*)"gen_cnode", (void*)bifs );*/
 
     gen_cnode_module_open_exit:
     return modules;

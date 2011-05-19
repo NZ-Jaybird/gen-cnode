@@ -17,12 +17,31 @@
 typedef struct gen_cnode_state_s {
     int erl_fd;                 //FD for outgoing messages
     gboolean running;           //Have we received a stop commmand?
+    gboolean receiving;
     gen_cnode_t node;           //Node network specifics: fd, addr_in, ei_cnode
     gen_cnode_opts_t* opts;     //gen_cnode options
     GHashTable* modules;        //Library hashtable
     GThreadPool* callback_pool; //Thread pool reserved for handling callback
 } gen_cnode_state_t;
 
+typedef struct gen_cnode_bif_s {
+    gchar* name;
+    gen_cnode_fp fp;
+} gen_cnode_bif_t;
+
+//gen_cnode BIFs
+int gen_cnode_load( int, char*, gen_cnode_state_t*, ei_x_buff* );
+int gen_cnode_stop( int, char*, gen_cnode_state_t*, ei_x_buff* );
+int gen_cnode_link( int, char*, gen_cnode_state_t*, ei_x_buff* );
+
+static gen_cnode_bif_t* gen_cnode_bifs[] = {
+        &(gen_cnode_bif_t){ "load", (gen_cnode_fp)gen_cnode_load },
+        &(gen_cnode_bif_t){ "stop", (gen_cnode_fp)gen_cnode_stop },
+        &(gen_cnode_bif_t){ "link", (gen_cnode_fp)gen_cnode_link },
+        NULL 
+};
+
+//Helpers
 int gen_cnode_check_args( gen_cnode_opts_t* opts );
 int gen_cnode_init( gen_cnode_opts_t* opts, gen_cnode_state_t* state );
 int gen_cnode_handle_connection( gen_cnode_state_t* state );
@@ -107,20 +126,20 @@ int gen_cnode_check_args( gen_cnode_opts_t* opts ){
 
     if( !(opts->name) ){
         rc = -EINVAL;
-        fprintf( stderr, "You must specify a node name (-N)! "
+        fprintf( stderr, "You must specify a node name (-n)! "
                          "Try --help\n");
         goto check_args_exit;
     }
 
     if( opts->port == 0 ){
         rc = -EINVAL;
-        fprintf( stderr, "You must specify a non-zero port (-P)! "
+        fprintf( stderr, "You must specify a non-zero port (-p)! "
                  "Try --help-all\n");
     }
 
     if( opts->threads < 0 ){
         rc = -EINVAL;
-        fprintf( stderr, "Number of worker threads must be non-zero!");
+        fprintf( stderr, "Number of worker threads must be non-zero!\n");
     }
 
     check_args_exit:
@@ -130,6 +149,8 @@ int gen_cnode_check_args( gen_cnode_opts_t* opts ){
 
 int gen_cnode_init( gen_cnode_opts_t* opts, gen_cnode_state_t* state ){
     int rc = 0;
+    int i;
+    gen_cnode_module_t* bifs = NULL;
 
     //Setup GLIB threading
     if( !g_thread_supported() ){
@@ -157,8 +178,25 @@ int gen_cnode_init( gen_cnode_opts_t* opts, gen_cnode_state_t* state ){
         goto gen_cnode_init_exit;
     }
 
-    state->running = TRUE;
+    state->running = state->receiving = TRUE;
     state->modules = gen_cnode_module_init();
+
+    //Register Built-In Functions
+    bifs = g_new0( gen_cnode_module_t, 1 );
+    bifs->state = (struct gen_cnode_lib_state_s *)state;
+    bifs->funcs = g_hash_table_new_full( g_str_hash,
+                                         g_str_equal,
+                                         g_free,
+                                         NULL );
+    
+    //Iterate through BIFs to build up gen_cnode module info
+    for( i=0; gen_cnode_bifs[i]; i++ ){
+         gen_cnode_bif_t* bif = gen_cnode_bifs[i];
+         g_hash_table_insert( bifs->funcs, bif->name, (void*)bif->fp );
+    }
+
+    //Add gen_cnode entry
+    g_hash_table_insert( state->modules, (void*)"gen_cnode", (void*)bifs );
 
     gen_cnode_init_exit:
     return rc;
@@ -288,10 +326,9 @@ bool gen_cnode_msg2cb( char* msg,
 
 int gen_cnode_handle_connection( gen_cnode_state_t* state ){
     int rc = 0;
-    bool receiving = TRUE;
     GError* error = NULL;
 
-    while( receiving ){
+    while( state->receiving ){
         guint32 num_bytes = 0;
         ei_x_buff xbuffer;
         erlang_msg erl_msg;
@@ -304,11 +341,12 @@ int gen_cnode_handle_connection( gen_cnode_state_t* state ){
             goto handle_connection_exit;
         }
         
-        num_bytes = ei_receive_msg( state->erl_fd, 
-                                    &erl_msg, 
-                                    &xbuffer );
+        num_bytes = ei_receive_msg_tmo( state->erl_fd, 
+                                        &erl_msg, 
+                                        &xbuffer,
+                                        1000 );
         
-        //<<HERE>> Pull out EMSGSIZE and allow for variable length? 
+        //Handle message based on return code
         switch( num_bytes ){
             case EAGAIN:
             case ERL_TICK:
@@ -348,16 +386,6 @@ int gen_cnode_handle_connection( gen_cnode_state_t* state ){
         fprintf( stderr, "lib: %s, func: %s, argc: %d\n", 
                  callback->lib, callback->func, callback->argc );
 
-        //<<HERE>> Better way to handle this?
-        if( !(g_strcmp0(callback->lib, "gen_cnode")) && 
-            !(g_strcmp0(callback->func, "stop")) )
-        {
-                state->running = FALSE;
-                receiving = FALSE;
-                gen_cnode_free_callback( callback );
-                break;
-        }
-        
         //Otherwise, push the request into the pool and get back to listening..
         g_thread_pool_push( state->callback_pool, (gpointer)callback, &error );
         if( error ){
@@ -394,4 +422,30 @@ void gen_cnode_handle_callback( gen_cnode_callback_t* callback,
     ei_x_free(&resp);
     
     gen_cnode_free_callback( callback );
+}
+
+int gen_cnode_load( int argc, 
+                    char* args, 
+                    gen_cnode_state_t* state, 
+                    ei_x_buff* resp )
+{
+    return gen_cnode_module_load(argc, args, state->modules, resp);
+}
+
+int gen_cnode_stop( int argc, 
+                    char* args, 
+                    gen_cnode_state_t* state, 
+                    ei_x_buff* resp )
+{
+    state->running = state->receiving = FALSE;
+    return 0;
+}
+
+int gen_cnode_link( int argc, 
+                    char* args, 
+                    gen_cnode_state_t* state, 
+                    ei_x_buff* resp )
+{
+    ei_x_format(resp, "{~a, ~p}", "ok", ei_self(&(state->node.ec)));
+    return 0;
 }

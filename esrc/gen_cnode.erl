@@ -43,7 +43,7 @@ exec_gen_cnode( State ) when is_record( State, gen_cnode_state ) ->
                                     State#gen_cnode_state.port, 
                                     erlang:get_cookie() ] ),  
     error_logger:info_msg("Calling: ~s~n", [ Command ]),
-    os:cmd( Command ).   %% <<HERE>> Load the Libs listed in initial state
+    os:cmd( Command ).   
 
 %% Parse args and exec gen_cnode binary
 init( Args ) ->
@@ -52,8 +52,8 @@ init( Args ) ->
                                                 libs=[], 
                                                 cnode='c0@localhost' } ),
     
-    %%Start gen_cnode binary
-    spawn( fun() -> exec_gen_cnode( State ) end ),
+    %%Start gen_cnode binary and link to it
+    link( spawn( fun() -> exec_gen_cnode( State ) end ) ),
 
     %%Shutdown gen_cnode binary on exit
     process_flag( trap_exit, true ),
@@ -62,8 +62,6 @@ init( Args ) ->
     %%unregister(State#gen_cnode_state.name),
     unregister(gen_cnode),
     true = register(State#gen_cnode_state.name, self()),
-
-    error_logger:info_msg("registered: ~p~n", [registered()]),
 
     { ok, State }.
 
@@ -76,6 +74,8 @@ handle_call( {load, Libs}, _From, State ) when is_list( Libs ) ->
             {reply, Reply, State}
     end;
 
+
+
 %% Signal gen_cnode to perfrom the specified routine
 handle_call( {Lib, Func, Args}, _From, State ) when is_atom(Lib)  and 
                                                     is_atom(Func) and 
@@ -85,19 +85,23 @@ handle_call( {Lib, Func, Args}, _From, State ) when is_atom(Lib)  and
 
     receive
         Reply ->
-            error_logger:info_msg("Response for callback: ~p~n", [Reply]),
-
             {reply, Reply, State}
     end;
 
 handle_call( _Request, _From, State ) -> {noreply, State}.
 
-handle_cast( stop, State ) -> terminate( normal, State ), {noreply, State};
+handle_cast( stop, State ) -> {stop, normal, State};
 handle_cast( _Request, State ) -> {noreply, State}.
+
+%%Handle trap_exit on child C gen_cnode
+handle_info( {'EXIT', _Pid, _Reason}, State ) ->
+    error_logger:error_info("C proccess went away unexpectedly! Exiting!"),    
+    {stop, normal, State};
+
 handle_info( _Info, State) -> {noreply, State}.
 
-%% Signal gen_cnode process to halt
-terminate(_Reason, State) -> 
+terminate(_Reason, State) ->
+    %% Signal c gen_cnode process to exit
     {any, State#gen_cnode_state.cnode} ! { self(), {gen_cnode, stop, []} }.
 
 code_change(_OldVsn, State, _Extra ) -> {ok, State}.
