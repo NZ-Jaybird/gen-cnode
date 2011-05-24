@@ -1,6 +1,6 @@
 include ../Makedefs
 
-LIB_TARGETS := libhello_world.so libhello_world_cpp.so #libOgreManager.so
+LIB_TARGETS := libhello_world.so libhello_world_cpp.so
 
 CFLAGS += -I../include
 CFLAGS += -I$(ERL_INTERFACE_INCLUDE)
@@ -15,6 +15,8 @@ endif
 default: all ;
 
 all: $(LIB_TARGETS) ;
+
+install: ;
 
 clean:
 	rm -f ./*.o
@@ -36,11 +38,3 @@ libhello_world.o: libhello_world.c
 libhello_world.so: CFLAGS += -fPIC
 libhello_world.so: libhello_world.o
 	$(CC) $(LDFLAGS) $^ $(LFLAGS) -o $@
-
-#libOgreManager.o: libOgreManager.cpp
-#	$(CPP) -c -o $@ $(CFLAGS) $<
-
-#libOgreManager.so: CFLAGS += -fPIC $(shell pkg-config --cflags OGRE)
-#libOgreManager.so: LFLAGS += $(shell pkg-config --libs OGRE)
-#libOgreManager.so: libOgreManager.o
-#	$(CPP) $(LDFLAGS) $^ $(LFLAGS) -o $@

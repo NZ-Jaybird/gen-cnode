@@ -133,7 +133,6 @@ int gen_cnode_module_load_required( gen_cnode_module_t* module ){
     return rc;
 }
 
-// {gen_cnode, load, lib_name}
 int gen_cnode_module_load( int argc,
                            char* args, 
                            GHashTable* modules,

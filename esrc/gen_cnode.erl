@@ -4,8 +4,6 @@
 %state of gen_cnode
 -record( gen_cnode_state, {name, port, hostname, libs, cnode} ).
 
-%API functions
-
 %%gen_server callbacks
 -export( [  start_link/1,
             init/1,
@@ -38,7 +36,7 @@ parse_args( [H | T], State ) when is_tuple(H) ->
 
 %%Build up gen_cnode command based on state
 exec_gen_cnode( State ) when is_record( State, gen_cnode_state ) ->
-    Command = io_lib:format( "gen_cnode -n ~s -p ~w -s ~s", 
+    Command = io_lib:format( code:priv_dir(?MODULE) ++ "/bin/gen_cnode -n ~s -p ~w -s ~s", 
                                 [   State#gen_cnode_state.name, 
                                     State#gen_cnode_state.port, 
                                     erlang:get_cookie() ] ),  
@@ -59,7 +57,6 @@ init( Args ) ->
     process_flag( trap_exit, true ),
 
     %%register ourselves under State.name
-    %%unregister(State#gen_cnode_state.name),
     unregister(gen_cnode),
     true = register(State#gen_cnode_state.name, self()),
 
@@ -73,8 +70,6 @@ handle_call( {load, Libs}, _From, State ) when is_list( Libs ) ->
         Reply ->
             {reply, Reply, State}
     end;
-
-
 
 %% Signal gen_cnode to perfrom the specified routine
 handle_call( {Lib, Func, Args}, _From, State ) when is_atom(Lib)  and 
@@ -95,13 +90,13 @@ handle_cast( _Request, State ) -> {noreply, State}.
 
 %%Handle trap_exit on child C gen_cnode
 handle_info( {'EXIT', _Pid, _Reason}, State ) ->
-    error_logger:error_info("C proccess went away unexpectedly! Exiting!"),    
+    error_logger:error_info("C process went away unexpectedly! Exiting!"),    
     {stop, normal, State};
 
 handle_info( _Info, State) -> {noreply, State}.
 
 terminate(_Reason, State) ->
-    %% Signal c gen_cnode process to exit
+    %% Signal C gen_cnode process to exit
     {any, State#gen_cnode_state.cnode} ! { self(), {gen_cnode, stop, []} }.
 
 code_change(_OldVsn, State, _Extra ) -> {ok, State}.

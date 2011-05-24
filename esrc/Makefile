@@ -1,9 +1,4 @@
-CMD = erl -eval 'io:format("~s~n", [code:lib_dir()])' -s init stop -noshell
-
-NAME = gen_cnode
-VERSION = 0.0.1
-LIB_DIR = $(shell $(CMD))
-INSTALL_DIR = $(LIB_DIR)/$(NAME)-$(VERSION)
+include ../Makedefs
 
 ERL_FILES := $(wildcard *.erl)
 BEAM_TARGETS := $(addsuffix .beam, $(basename $(ERL_FILES)))
@@ -23,10 +18,6 @@ clean:
 clobber: clean ;
 
 install: all
-	install -m 0755 -d $(INSTALL_DIR)
-	install -m 0755 -d $(INSTALL_DIR)/ebin
-	install -m 0755 -d $(INSTALL_DIR)/esrc
-	install -m 0755 $(ERL_FILES) $(INSTALL_DIR)/esrc
-	install -m 0755 $(BEAM_TARGETS) $(INSTALL_DIR)/ebin
+	install -m 0755 $(BEAM_TARGETS) $(EBIN_DIR)
 
 uninstall: ;

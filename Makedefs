@@ -15,3 +15,11 @@ endif
 ERL_INTERFACE_ROOT = $(addprefix $(ERL_ROOT)/lib/, $(shell ls $(ERL_ROOT)/lib | grep erl_interface))
 ERL_INTERFACE_INCLUDE = $(ERL_INTERFACE_ROOT)/include
 ERL_INTERFACE_LIB = $(ERL_INTERFACE_ROOT)/lib
+
+VERSION := 0.5.0
+
+INSTALL_DIR := $(ERL_ROOT)/lib/gen_cnode-$(VERSION)
+PRIV_DIR := $(INSTALL_DIR)/priv
+EBIN_DIR := $(INSTALL_DIR)/ebin
+BIN_DIR := $(PRIV_DIR)/bin
+DOC_DIR := $(INSTALL_DIR)/man
