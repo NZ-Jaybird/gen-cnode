@@ -25,7 +25,7 @@ ifeq ($(PREFIX),)
 	export PREFIX=$(shell pwd)
 endif
 
-INSTALL_DIR := $(PREFIX)/gen_cnode-$(VERSION)
+INSTALL_DIR := $(PREFIX)/lib/gen_cnode-$(VERSION)
 SRC_DIR := $(INSTALL_DIR)/src
 PRIV_DIR := $(INSTALL_DIR)/priv
 EBIN_DIR := $(INSTALL_DIR)/ebin
