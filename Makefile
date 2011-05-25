@@ -8,8 +8,8 @@ all clean clobber: $(SUBDIRS) ;
 
 makedir:
 	install --mode=755 -d $(INSTALL_DIR)
+	install --mode=755 -d $(SRC_DIR)
 	install --mode=755 -d $(PRIV_DIR)
-	install --mode=755 -d $(BIN_DIR)
 	install --mode=755 -d $(EBIN_DIR)
 
 install: makedir $(SUBDIRS) 

@@ -6,7 +6,10 @@ LDFLAGS=
 ARCH := $(shell uname -m | tr -s " ")
 KERNEL := $(shell uname -s | tr -s " ")
 
-ERL_ROOT = $(shell erl -noshell -eval 'io:format("~s~n", [code:root_dir()]), init:stop().')
+ifeq ($(ERL_ROOT),)
+	export ERL_ROOT=$(shell erl -noshell -eval 'io:format("~s~n", [code:root_dir()]), init:stop().')
+endif
+
 ifeq (,$(ERL_ROOT))
 $(error "Unable to locate erlang root directory! Is erlang installed?")
 endif
@@ -18,8 +21,11 @@ ERL_INTERFACE_LIB = $(ERL_INTERFACE_ROOT)/lib
 
 VERSION := 0.5.0
 
-INSTALL_DIR := $(ERL_ROOT)/lib/gen_cnode-$(VERSION)
+ifeq ($(PREFIX),)
+	export PREFIX=$(shell pwd)
+endif
+
+INSTALL_DIR := $(PREFIX)/gen_cnode-$(VERSION)
+SRC_DIR := $(INSTALL_DIR)/src
 PRIV_DIR := $(INSTALL_DIR)/priv
 EBIN_DIR := $(INSTALL_DIR)/ebin
-BIN_DIR := $(PRIV_DIR)/bin
-DOC_DIR := $(INSTALL_DIR)/man

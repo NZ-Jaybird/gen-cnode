@@ -20,7 +20,7 @@ default: all ;
 all: $(BIN_TARGETS) $(LIB_TARGETS) ;
 
 install: all
-	install -m 755 gen_cnode $(BIN_DIR) 
+	install -m 755 gen_cnode $(PRIV_DIR) 
 
 clean:
 	rm -f ./*.o

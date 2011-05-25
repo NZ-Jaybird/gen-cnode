@@ -15,7 +15,7 @@
          ] ).
 
 start_link( Args ) when is_list(Args) ->
-    gen_server:start_link({local, ?MODULE}, gen_cnode, Args, []).
+    gen_server:start_link({local, ?MODULE}, ?MODULE, Args, []).
 
 parse_arg( {libs, Libs}, State ) when is_list(Libs) ->
     State#gen_cnode_state{ libs = Libs };
@@ -36,7 +36,7 @@ parse_args( [H | T], State ) when is_tuple(H) ->
 
 %%Build up gen_cnode command based on state
 exec_gen_cnode( State ) when is_record( State, gen_cnode_state ) ->
-    Command = io_lib:format( code:priv_dir(?MODULE) ++ "/bin/gen_cnode -n ~s -p ~w -s ~s", 
+    Command = io_lib:format( code:priv_dir(?MODULE) ++ "/gen_cnode -n ~s -p ~w -s ~s", 
                                 [   State#gen_cnode_state.name, 
                                     State#gen_cnode_state.port, 
                                     erlang:get_cookie() ] ),  
@@ -51,13 +51,13 @@ init( Args ) ->
                                                 cnode='c0@localhost' } ),
     
     %%Start gen_cnode binary and link to it
-    link( spawn( fun() -> exec_gen_cnode( State ) end ) ),
+    spawn_link( fun() -> exec_gen_cnode( State ) end ),
 
     %%Shutdown gen_cnode binary on exit
     process_flag( trap_exit, true ),
 
     %%register ourselves under State.name
-    unregister(gen_cnode),
+    unregister(?MODULE),
     true = register(State#gen_cnode_state.name, self()),
 
     { ok, State }.
