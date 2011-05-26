@@ -16,7 +16,7 @@ default: all ;
 
 all: $(LIB_TARGETS) ;
 
-install: ;
+install: all;
 
 clean:
 	rm -f ./*.o

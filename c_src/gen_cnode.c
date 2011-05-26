@@ -37,7 +37,6 @@ int gen_cnode_link( int, char*, gen_cnode_state_t*, ei_x_buff* );
 static gen_cnode_bif_t* gen_cnode_bifs[] = {
         &(gen_cnode_bif_t){ "load", (gen_cnode_fp)gen_cnode_load },
         &(gen_cnode_bif_t){ "stop", (gen_cnode_fp)gen_cnode_stop },
-        &(gen_cnode_bif_t){ "link", (gen_cnode_fp)gen_cnode_link },
         NULL 
 };
 
@@ -341,40 +340,59 @@ int gen_cnode_handle_connection( gen_cnode_state_t* state ){
             goto handle_connection_exit;
         }
         
-        num_bytes = ei_receive_msg_tmo( state->erl_fd, 
-                                        &erl_msg, 
-                                        &xbuffer,
-                                        1000 );
-        
-        //Handle message based on return code
-        switch( num_bytes ){
-            case EAGAIN:
+        num_bytes = ei_xreceive_msg_tmo( state->erl_fd, 
+                                         &erl_msg, 
+                                         &xbuffer,
+                                         1000 );
+       
+        if( num_bytes == ERL_ERROR ){
+            
+            switch(erl_errno){
+                
+                case EAGAIN:
+                case ETIMEDOUT:
+                    ei_x_free(&xbuffer);
+                    continue;
+
+                default:
+                    rc = erl_errno;
+                    fprintf(stderr, "ei_xreceive_msg_tmo failed! erl_errno = %d!\n", erl_errno);
+                    goto handle_connection_exit;
+            }
+        }
+
+        switch( erl_msg.msgtype ){
+
+            //Regular message, continue on...
+            case ERL_SEND:
+            case ERL_REG_SEND:
+                break;
+
+            case ERL_LINK:
+            case ERL_UNLINK:
+                ei_x_free(&xbuffer);
+                printf("DEBUG: LINK/UNLIK!\n");
+                continue;
+
             case ERL_TICK:
+                ei_x_free(&xbuffer);
                 continue;
             
-            case EMSGSIZE:
-            case ENOMEM:
-            case EIO:
+            case ERL_ERROR: //Something bad happened..timeout, etc...
                 rc = -num_bytes;
-                fprintf( stderr, "Buffer I/O error! rc = %d\n", num_bytes );
+                fprintf( stderr, "Error message received!\n" );
                 goto handle_connection_exit;
-            
-            case ERL_ERROR:
-                rc = -num_bytes;
-                fprintf( stderr, "ei_receive_msg failed! rc = %d\n", rc );
-                goto handle_connection_exit;
+
+            case ERL_EXIT:  //Link to erlang side broken, exit normally
+                state->running = state->receiving = FALSE;
+                continue;
 
             default:
-                break;
+                fprintf( stderr, "HUH?!\n" );
+                ei_x_free(&xbuffer);
+                continue;
         }
     
-        //Only accept ERL_REG_SEND 
-        if( erl_msg.msgtype != ERL_REG_SEND ){
-            ei_x_free(&xbuffer);
-            fprintf( stderr, "Only ERL_REG_SEND is supported!\n");
-            continue;
-        }
-
         //Attempt to convert message into a callback
         callback = g_new0( gen_cnode_callback_t, 1 );
         if( !gen_cnode_msg2cb( xbuffer.buff, num_bytes, callback ) ){
@@ -424,6 +442,8 @@ void gen_cnode_handle_callback( gen_cnode_callback_t* callback,
     gen_cnode_free_callback( callback );
 }
 
+
+/*********** Built-in Functions *************/
 int gen_cnode_load( int argc, 
                     char* args, 
                     gen_cnode_state_t* state, 
@@ -438,14 +458,5 @@ int gen_cnode_stop( int argc,
                     ei_x_buff* resp )
 {
     state->running = state->receiving = FALSE;
-    return 0;
-}
-
-int gen_cnode_link( int argc, 
-                    char* args, 
-                    gen_cnode_state_t* state, 
-                    ei_x_buff* resp )
-{
-    ei_x_format(resp, "{~a, ~p}", "ok", ei_self(&(state->node.ec)));
     return 0;
 }
