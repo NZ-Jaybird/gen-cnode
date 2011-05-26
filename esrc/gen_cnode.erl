@@ -41,7 +41,11 @@ exec_gen_cnode( State ) when is_record( State, gen_cnode_state ) ->
                                     State#gen_cnode_state.port, 
                                     erlang:get_cookie() ] ),  
     error_logger:info_msg("Calling: ~s~n", [ Command ]),
-    os:cmd( Command ).   
+    Out = os:cmd( Command ),
+    error_logger:info_msg("C process exited."
+                          "~n------Output: Start------~n"
+                          "~s"
+                          "~n------Output: End------~n", [Out]).   
 
 %% Parse args and exec gen_cnode binary
 init( Args ) ->

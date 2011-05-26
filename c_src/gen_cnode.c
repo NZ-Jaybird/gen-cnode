@@ -344,7 +344,8 @@ int gen_cnode_handle_connection( gen_cnode_state_t* state ){
                                          &erl_msg, 
                                          &xbuffer,
                                          1000 );
-       
+      
+        //Check for error conditions 
         if( num_bytes == ERL_ERROR ){
             
             switch(erl_errno){
@@ -361,20 +362,21 @@ int gen_cnode_handle_connection( gen_cnode_state_t* state ){
             }
         }
 
+        //Handle messages based on type
         switch( erl_msg.msgtype ){
 
-            //Regular message, continue on...
-            case ERL_SEND:
+            
+            case ERL_SEND:      //Regular message, continue on...
             case ERL_REG_SEND:
                 break;
 
-            case ERL_LINK:
+            case ERL_LINK:      //<<HERE>> Investigate further
             case ERL_UNLINK:
                 ei_x_free(&xbuffer);
                 printf("DEBUG: LINK/UNLIK!\n");
                 continue;
 
-            case ERL_TICK:
+            case ERL_TICK:  //Heartbeat
                 ei_x_free(&xbuffer);
                 continue;
             
