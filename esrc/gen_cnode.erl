@@ -72,6 +72,14 @@ init( Args ) ->
     { ok, State }.
 
 %% Signal gen_cnode process to load the specified library
+handle_call( {load, Lib}, _From, State ) when is_atom( Lib ) ->
+    {any, State#gen_cnode_state.cnode} ! {self(), {gen_cnode, load, [Lib]}},
+
+    receive
+        Reply ->
+            {reply, Reply, State}
+    end;
+
 handle_call( {load, Libs}, _From, State ) when is_list( Libs ) ->
     {any, State#gen_cnode_state.cnode} ! { self(), {gen_cnode, load, Libs} },
 
@@ -81,6 +89,14 @@ handle_call( {load, Libs}, _From, State ) when is_list( Libs ) ->
     end;
 
 %% Signal gen_cnode to perfrom the specified routine
+handle_call( {Lib, Func}, _From, State ) when is_atom(Lib) and is_atom(Func) ->
+    {any, State#gen_cnode_state.cnode} ! { self(), {Lib, Func, []} },
+
+    receive
+        Reply ->
+            {reply, Reply, State}
+    end;
+
 handle_call( {Lib, Func, Args}, _From, State ) when is_atom(Lib)  and 
                                                     is_atom(Func) and 
                                                     is_list(Args) ->
