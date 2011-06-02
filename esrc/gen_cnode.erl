@@ -2,7 +2,7 @@
 -behaviour(gen_server).
 
 %state of gen_cnode
--record( gen_cnode_state, {name, port, hostname, libs, cnode} ).
+-record( gen_cnode_state, {name, port, hostname, libs, threads, cnode} ).
 
 %%gen_server callbacks
 -export( [  start_link/1,
@@ -16,6 +16,9 @@
 
 start_link( Args ) when is_list(Args) ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, Args, []).
+
+parse_arg( {threads, Threads}, State ) when is_integer(Threads) ->
+    State#gen_cnode_state{ threads = Threads };
 
 parse_arg( {libs, Libs}, State ) when is_list(Libs) ->
     State#gen_cnode_state{ libs = Libs };
@@ -36,9 +39,10 @@ parse_args( [H | T], State ) when is_tuple(H) ->
 
 %%Build up gen_cnode command based on state
 exec_gen_cnode( State ) when is_record( State, gen_cnode_state ) ->
-    Command = io_lib:format( code:priv_dir(?MODULE) ++ "/gen_cnode -n ~s -p ~w -s ~s", 
+    Command = io_lib:format( code:priv_dir(?MODULE) ++ "/gen_cnode -n ~s -p ~w -t ~w -s ~s", 
                                 [   State#gen_cnode_state.name, 
-                                    State#gen_cnode_state.port, 
+                                    State#gen_cnode_state.port,
+                                    State#gen_cnode_state.threads, 
                                     erlang:get_cookie() ] ),  
     error_logger:info_msg("Calling: ~s~n", [ Command ]),
     Out = os:cmd( Command ),
@@ -51,6 +55,7 @@ exec_gen_cnode( State ) when is_record( State, gen_cnode_state ) ->
 init( Args ) ->
     State = parse_args( Args, #gen_cnode_state{ name='c0', 
                                                 port=30000, 
+                                                threads=1,
                                                 libs=[], 
                                                 cnode='c0@localhost' } ),
     
