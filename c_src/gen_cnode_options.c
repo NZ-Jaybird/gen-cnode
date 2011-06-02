@@ -1,6 +1,6 @@
 #include "gen_cnode_options.h"
 
-gen_cnode_opts_t gen_cnode_opts = { NULL, 0, 2, 0, NULL };
+gen_cnode_opts_t gen_cnode_opts = { NULL, 0, 1, 0, NULL };
 
 gchar gen_cnode_opt_sname[] = "gen_cnode common";
 gchar gen_cnode_opt_lname[] = "gen_cnode common options:";
