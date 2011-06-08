@@ -1,7 +1,6 @@
 #include <iostream>
 #include <glib.h>
 
-#include "OGRE/OgreRoot.h"
 #include "gen_cnode.h"
 
 //GEN_CNODE_REQUIRE("foo","bar");
