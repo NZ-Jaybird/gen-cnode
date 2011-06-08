@@ -30,7 +30,7 @@ clobber: clean
 	rm -f $(BIN_TARGETS)
 
 %.o: %.c
-	$(CC) -c -o $@ $(CFLAGS) $<
+	$(CPP) -c -o $@ $(CFLAGS) $<
 
 gen_cnode: gen_cnode_net.o gen_cnode_options.o gen_cnode_module.o gen_cnode.o
-	$(CC) $^ $(LDFLAGS) -o $@
+	$(CPP) $^ $(LDFLAGS) -o $@
