@@ -152,17 +152,19 @@ int gen_cnode_init( gen_cnode_opts_t* opts, gen_cnode_state_t* state ){
     gen_cnode_module_t* bifs = NULL;
 
     //Setup GLIB threading
-    if( !g_thread_supported() ){
+    if( opts->threads && !g_thread_supported() ){
         g_thread_init(NULL);
-    }
 
-    //Setup connection pool
-    state->callback_pool = g_thread_pool_new( (GFunc)gen_cnode_handle_callback,
-                                              state, opts->threads, FALSE, FALSE );
-    if( !(state->callback_pool) ){
-        rc = -1;
-        fprintf( stderr, "g_thread_pool_new failed!\n" );
-        goto gen_cnode_init_exit;
+        //Setup connection pool
+        state->callback_pool = g_thread_pool_new( (GFunc)gen_cnode_handle_callback,
+                                                  state, opts->threads, FALSE, FALSE );
+        if( !(state->callback_pool) ){
+            rc = -1;
+            fprintf( stderr, "g_thread_pool_new failed!\n" );
+            goto gen_cnode_init_exit;
+        }
+    } else {
+        printf("DEBUG: Thread pool disabled!\n");
     }
 
     rc = gen_cnode_net_init( opts->name,
@@ -406,14 +408,18 @@ int gen_cnode_handle_connection( gen_cnode_state_t* state ){
         fprintf( stderr, "lib: %s, func: %s, argc: %d\n", 
                  callback->lib, callback->func, callback->argc );
 
-        //Otherwise, push the request into the pool and get back to listening..
-        g_thread_pool_push( state->callback_pool, (gpointer)callback, &error );
-        if( error ){
-            rc = -1;
-            fprintf( stderr, "g_thread_push failed!\n");
-            fprintf( stderr, "%s\n", error->message);
-            break;
-        } 
+        //If worker queue is enabled, push callback to the pool 
+        if( state->callback_pool ){
+            g_thread_pool_push( state->callback_pool, (gpointer)callback, &error );
+            if( error ){
+                rc = -1;
+                fprintf( stderr, "g_thread_push failed!\n");
+                fprintf( stderr, "%s\n", error->message);
+                break;
+            }
+        } else { //Otherwise, handle it in stride
+            gen_cnode_handle_callback( callback, state );
+        }
     }  
    
     handle_connection_exit: 
