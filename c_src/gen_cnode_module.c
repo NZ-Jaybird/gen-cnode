@@ -140,7 +140,6 @@ int gen_cnode_module_load( int argc,
 
     int rc = 0;
     int i, index;
-    char* lib_name = NULL;
     gchar* fullname = NULL;
 
     if( !args || !argc || !modules || !resp ){
@@ -163,6 +162,7 @@ int gen_cnode_module_load( int argc,
         //If the module already is loaded...skip to end
         if( (module = (gen_cnode_module_t*)g_hash_table_lookup(modules, lib_name)) ){
             ei_x_format(resp, "{~a,~a,~s}", 
+
                         "error", "already_loaded", lib_name);
             goto load_exit;;
         }
