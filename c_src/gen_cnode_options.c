@@ -8,7 +8,7 @@ gchar gen_cnode_opt_shows[] = "Show gen_cnode common options";
 GOptionEntry gen_cnode_opt_entries[] = {
     GEN_CNODE_NAME,
     GEN_CNODE_PORT,
-    GEN_CNODE_THREADS,
+    GEN_CNODE_WORKERS,
     GEN_CNODE_CREATION,
     GEN_CNODE_COOKIE,
     {NULL}

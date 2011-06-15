@@ -150,9 +150,10 @@ int gen_cnode_module_load( int argc,
 
     for( i=0, index=0; i < argc; i++ ){
         GModule *lib = NULL;
+        char lib_name[256];
         gen_cnode_module_t* module = NULL;
         
-        lib_name = g_new0( char, 256 );
+        memset(lib_name, 0x00, sizeof(lib_name));
 
         if( (rc = ei_decode_atom(args, &index, lib_name)) ){
             ei_x_format(resp, "{~a,~a}", "error", "not_a_string");
@@ -202,7 +203,7 @@ int gen_cnode_module_load( int argc,
         gen_cnode_module_load_exit( module );
 
         //Stash the module in the modules hash_table
-        g_hash_table_insert( modules, lib_name, module );
+        g_hash_table_insert( modules, g_strdup(lib_name), module );
      
         printf("DEBUG: loaded %s....\n", fullname);
 

@@ -2,7 +2,7 @@
 -behaviour(gen_server).
 
 %state of gen_cnode
--record( gen_cnode_state, {name, port, hostname, libs, threads, cnode} ).
+-record( gen_cnode_state, {name, port, hostname, libs, workers, cnode} ).
 
 %%gen_server callbacks
 -export( [  start_link/1,
@@ -17,8 +17,8 @@
 start_link( Args ) when is_list(Args) ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, Args, []).
 
-parse_arg( {threads, Threads}, State ) when is_integer(Threads) ->
-    State#gen_cnode_state{ threads = Threads };
+parse_arg( {workers, Workers}, State ) when is_integer(Workers) ->
+    State#gen_cnode_state{ workers = Workers };
 
 parse_arg( {libs, Libs}, State ) when is_list(Libs) ->
     State#gen_cnode_state{ libs = Libs };
@@ -39,10 +39,10 @@ parse_args( [H | T], State ) when is_tuple(H) ->
 
 %%Build up gen_cnode command based on state
 exec_gen_cnode( State ) when is_record( State, gen_cnode_state ) ->
-    Command = io_lib:format( code:priv_dir(?MODULE) ++ "/gen_cnode -n ~s -p ~w -t ~w -s ~s", 
+    Command = io_lib:format( code:priv_dir(?MODULE) ++ "/gen_cnode -n ~s -p ~w -w ~w -s ~s", 
                                 [   State#gen_cnode_state.name, 
                                     State#gen_cnode_state.port,
-                                    State#gen_cnode_state.threads, 
+                                    State#gen_cnode_state.workers, 
                                     erlang:get_cookie() ] ),  
     error_logger:info_msg("Calling: ~s~n", [ Command ]),
     Out = os:cmd( Command ),
@@ -55,7 +55,7 @@ exec_gen_cnode( State ) when is_record( State, gen_cnode_state ) ->
 init( Args ) ->
     State = parse_args( Args, #gen_cnode_state{ name='c0', 
                                                 port=30000, 
-                                                threads=1,
+                                                workers=0,
                                                 libs=[], 
                                                 cnode='c0@localhost' } ),
     
@@ -73,7 +73,7 @@ init( Args ) ->
 
 %% Signal gen_cnode process to load the specified library
 handle_call( {load, Lib}, _From, State ) when is_atom( Lib ) ->
-    {any, State#gen_cnode_state.cnode} ! {self(), {gen_cnode, load, [Lib]}},
+    {any, State#gen_cnode_state.cnode} ! {parent, self(), {gen_cnode, load, [Lib]}},
 
     receive
         Reply ->
@@ -81,7 +81,7 @@ handle_call( {load, Lib}, _From, State ) when is_atom( Lib ) ->
     end;
 
 handle_call( {load, Libs}, _From, State ) when is_list( Libs ) ->
-    {any, State#gen_cnode_state.cnode} ! { self(), {gen_cnode, load, Libs} },
+    {any, State#gen_cnode_state.cnode} ! { parent, self(), {gen_cnode, load, Libs} },
 
     receive
         Reply ->
@@ -89,8 +89,19 @@ handle_call( {load, Libs}, _From, State ) when is_list( Libs ) ->
     end;
 
 %% Signal gen_cnode to perfrom the specified routine
-handle_call( {Lib, Func}, _From, State ) when is_atom(Lib) and is_atom(Func) ->
-    {any, State#gen_cnode_state.cnode} ! { self(), {Lib, Func, []} },
+handle_call( {Lib, Func}, _From, State ) when is_atom(Lib) and
+                                              is_atom(Func) ->
+    {any, State#gen_cnode_state.cnode} ! { parent, self(), {Lib, Func, []} },
+
+    receive
+        Reply ->
+            {reply, Reply, State}
+    end;
+
+handle_call( {Actor, Lib, Func}, _From, State ) when is_atom(Actor) and
+                                                     is_atom(Lib) and 
+                                                     is_atom(Func) ->
+    {any, State#gen_cnode_state.cnode} ! { Actor, self(), {Lib, Func, []} },
 
     receive
         Reply ->
@@ -101,7 +112,19 @@ handle_call( {Lib, Func, Args}, _From, State ) when is_atom(Lib)  and
                                                     is_atom(Func) and 
                                                     is_list(Args) ->
 
-    {any, State#gen_cnode_state.cnode} ! { self(), {Lib, Func, Args} },
+    {any, State#gen_cnode_state.cnode} ! { parent, self(), {Lib, Func, Args} },
+
+    receive
+        Reply ->
+            {reply, Reply, State}
+    end;
+
+handle_call( {Actor, Lib, Func, Args}, _From, State ) when is_atom(Actor) and
+                                                           is_atom(Lib)  and 
+                                                           is_atom(Func) and 
+                                                           is_list(Args) ->
+
+    {any, State#gen_cnode_state.cnode} ! { Actor, self(), {Lib, Func, Args} },
 
     receive
         Reply ->
@@ -122,6 +145,6 @@ handle_info( _Info, State) -> {noreply, State}.
 
 terminate(_Reason, State) ->
     %% Signal C gen_cnode process to exit
-    {any, State#gen_cnode_state.cnode} ! { self(), {gen_cnode, stop, []} }.
+    {any, State#gen_cnode_state.cnode} ! { parent, self(), {gen_cnode, stop, []} }.
 
 code_change(_OldVsn, State, _Extra ) -> {ok, State}.

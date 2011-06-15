@@ -19,6 +19,7 @@ typedef struct gen_cnode_module_entry_s {
 } gen_cnode_module_entry_t;
 
 typedef struct gen_cnode_callback_s {
+    gboolean parent;                    //Is the parent thread the actor?
     erlang_pid from;                    //Pid making callback
     gchar lib  [MAXATOMLEN + 1];        //Library name
     gchar func [MAXATOMLEN + 1];        //Function name    
