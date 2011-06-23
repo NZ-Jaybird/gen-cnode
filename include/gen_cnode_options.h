@@ -4,11 +4,11 @@
 #include <glib.h>
 
 typedef struct gen_cnode_opts_s {
-    gchar* name;            //(Require) Name associated with cnode
-    guint16 port;           //(Required) Port on localhost on which to communicate
-    guint32 workers;        //(Optional) Numer of worker threads
+    gchar* name;            //(Require) Name associated with cnode.
+    guint16 port;           //(Required) Port on localhost on which to communicate.
+    gint32 workers;         //(Optional) Number of worker threads (default unlimited).
     guint32 creation;       //(Optional) Numeric id of the node for short name mode.
-    gchar* cookie;          //(Optional) Cookie used to decrypt/encrypt erlang messages
+    gchar* cookie;          //(Optional) Cookie used to decrypt/encrypt erlang messages.
 } gen_cnode_opts_t;
 
 extern gen_cnode_opts_t gen_cnode_opts;
@@ -32,7 +32,7 @@ extern gen_cnode_opts_t gen_cnode_opts;
     {                                                               \
         "workers", 'w', 0, G_OPTION_ARG_INT,                        \
         &(gen_cnode_opts.workers),                                  \
-        "Number of worker threads for handling callbacks",          \
+        "Number of worker threads for handling callbacks (default: unlimited)",          \
         "<#workers>"                                                \
     }     
 

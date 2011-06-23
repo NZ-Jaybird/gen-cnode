@@ -138,7 +138,7 @@ int gen_cnode_check_args( gen_cnode_opts_t* opts ){
                  "Try --help-all\n");
     }
 
-    if( opts->workers < 0 ){
+    if( (opts->workers < 0) && (opts->workers != -1) ){
         rc = -EINVAL;
         fprintf( stderr, "Number of worker threads must be non-zero!\n");
     }
@@ -194,8 +194,7 @@ int gen_cnode_init( gen_cnode_opts_t* opts, gen_cnode_state_t* state ){
     }
 
     //Initiate worker (non-inline) callback pool
-    if( opts->workers && !g_thread_supported() ){
-        g_thread_init(NULL);
+    if( opts->workers ){
 
         //Setup connection pool
         state->worker_pool = g_thread_pool_new( (GFunc)gen_cnode_handle_callback,
