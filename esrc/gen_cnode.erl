@@ -71,70 +71,87 @@ init( Args ) ->
 
     { ok, State }.
 
+%%%%%%%%%%   GEN_SEVER CALLS %%%%%%%%%%%%%%%
+
 %% Signal gen_cnode process to load the specified library
 handle_call( {load, Lib}, _From, State ) when is_atom( Lib ) ->
-    {any, State#gen_cnode_state.cnode} ! {parent, self(), {gen_cnode, load, [Lib]}},
-
-    receive
-        Reply ->
-            {reply, Reply, State}
-    end;
+    {any, State#gen_cnode_state.cnode} ! {parent, _From, {gen_cnode, load, [Lib]}},
+    {noreply, State};
 
 handle_call( {load, Libs}, _From, State ) when is_list( Libs ) ->
-    {any, State#gen_cnode_state.cnode} ! { parent, self(), {gen_cnode, load, Libs} },
-
-    receive
-        Reply ->
-            {reply, Reply, State}
-    end;
+    {any, State#gen_cnode_state.cnode} ! { parent, _From, {gen_cnode, load, Libs} },
+    {noreply, State};
 
 %% Signal gen_cnode to perfrom the specified routine
 handle_call( {Lib, Func}, _From, State ) when is_atom(Lib) and
                                               is_atom(Func) ->
-    {any, State#gen_cnode_state.cnode} ! { parent, self(), {Lib, Func, []} },
-
-    receive
-        Reply ->
-            {reply, Reply, State}
-    end;
+    {any, State#gen_cnode_state.cnode} ! { parent, _From, {Lib, Func, []} },
+    {noreply, State};
 
 handle_call( {Actor, Lib, Func}, _From, State ) when is_atom(Actor) and
                                                      is_atom(Lib) and 
                                                      is_atom(Func) ->
-    {any, State#gen_cnode_state.cnode} ! { Actor, self(), {Lib, Func, []} },
-
-    receive
-        Reply ->
-            {reply, Reply, State}
-    end;
+    {any, State#gen_cnode_state.cnode} ! { Actor, _From, {Lib, Func, []} },
+    {noreply, State};
 
 handle_call( {Lib, Func, Args}, _From, State ) when is_atom(Lib)  and 
                                                     is_atom(Func) and 
                                                     is_list(Args) ->
 
-    {any, State#gen_cnode_state.cnode} ! { parent, self(), {Lib, Func, Args} },
-
-    receive
-        Reply ->
-            {reply, Reply, State}
-    end;
+    {any, State#gen_cnode_state.cnode} ! { parent, _From, {Lib, Func, Args} },
+    {noreply, State};
 
 handle_call( {Actor, Lib, Func, Args}, _From, State ) when is_atom(Actor) and
                                                            is_atom(Lib)  and 
                                                            is_atom(Func) and 
                                                            is_list(Args) ->
 
-    {any, State#gen_cnode_state.cnode} ! { Actor, self(), {Lib, Func, Args} },
+    {any, State#gen_cnode_state.cnode} ! { Actor, _From, {Lib, Func, Args} },
+    {noreply, State};
 
-    receive
-        Reply ->
-            {reply, Reply, State}
-    end;
+handle_call( _Request, _From, State ) -> 
+    io:format("Got call...not sure what to do with it...~n"),
+    {noreply, State}.
 
-handle_call( _Request, _From, State ) -> {noreply, State}.
+
+%%%%%%%%%%   GEN_SEVER CASTS %%%%%%%%%%%%%%%
+handle_cast( {Lib, Func}, State ) when is_atom(Lib) and
+                                       is_atom(Func) ->
+    {any, State#gen_cnode_state.cnode} ! { parent, {Lib, Func, []} },
+    {noreply, State};
+
+handle_cast( {Actor, Lib, Func}, State ) when is_atom(Actor) and
+                                                     is_atom(Lib) and 
+                                                     is_atom(Func) ->
+    {any, State#gen_cnode_state.cnode} ! { Actor, {Lib, Func, []} },
+    {noreply, State};
+
+handle_cast( {Lib, Func, Args}, State ) when is_atom(Lib)  and 
+                                             is_atom(Func) and 
+                                             is_list(Args) ->
+
+    {any, State#gen_cnode_state.cnode} ! { parent, {Lib, Func, Args} },
+    {noreply, State};
+
+handle_cast( {Actor, Lib, Func, Args}, State ) when is_atom(Actor) and
+                                                    is_atom(Lib)  and 
+                                                    is_atom(Func) and 
+                                                    is_list(Args) ->
+
+    {any, State#gen_cnode_state.cnode} ! { Actor, {Lib, Func, Args} },
+    {noreply, State};
+
+
+%% Event dispatcher for the C side
+handle_cast( {event, {_Type,Data}}, State ) ->
+   io:format("Got event!! ~p~n", [Data]),
+   {noreply, State}; 
 
 handle_cast( stop, State ) -> {stop, normal, State};
-handle_cast( _Request, State ) -> {noreply, State}.
+
+handle_cast( _Request, State ) -> 
+    io:format("Got cast...not sure what to do with it...~n"),
+    {noreply, State}.
 
 %%Handle trap_exit on child C gen_cnode
 handle_info( {'EXIT', _Pid, _Reason}, State ) ->
@@ -145,6 +162,6 @@ handle_info( _Info, State) -> {noreply, State}.
 
 terminate(_Reason, State) ->
     %% Signal C gen_cnode process to exit
-    {any, State#gen_cnode_state.cnode} ! { parent, self(), {gen_cnode, stop, []} }.
+    {any, State#gen_cnode_state.cnode} ! { parent, {gen_cnode, stop, []} }.
 
 code_change(_OldVsn, State, _Extra ) -> {ok, State}.

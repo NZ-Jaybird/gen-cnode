@@ -155,13 +155,13 @@ int gen_cnode_module_load( int argc,
         memset(lib_name, 0x00, sizeof(lib_name));
 
         if( (rc = ei_decode_atom(args, &index, lib_name)) ){
-            ei_x_format(resp, "{~a,~a}", "error", "not_a_string");
+            gen_cnode_format(resp,"{~a,~a}", "error", "not_a_string");
             goto load_exit;
         }
 
         //If the module already is loaded...skip to end
         if( (module = (gen_cnode_module_t*)g_hash_table_lookup(modules, lib_name)) ){
-            ei_x_format(resp, "{~a,~a,~s}", 
+            gen_cnode_format(resp, "{~a,~a,~s}", 
 
                         "error", "already_loaded", lib_name);
             goto load_exit;;
@@ -173,7 +173,7 @@ int gen_cnode_module_load( int argc,
         //Attempt to load the module
         lib = g_module_open( fullname, (GModuleFlags)(G_MODULE_BIND_LAZY | G_MODULE_BIND_LOCAL) );
         if( !lib ){
-            ei_x_format(resp, "{~a,~a,~s}", "error", "not_found", lib_name);
+            gen_cnode_format(resp, "{~a,~a,~s}", "error", "not_found", lib_name);
             goto load_exit;
         }
 
@@ -187,7 +187,7 @@ int gen_cnode_module_load( int argc,
    
         //Globally load module prereqs
         if( (rc = gen_cnode_module_load_required(module)) ){
-            ei_x_format(resp, "{~a,~a,~s}", 
+            gen_cnode_format(resp, "{~a,~a,~s}", 
                         "error", "failed_to_load_required", fullname);
             goto load_exit;
         }
@@ -195,7 +195,7 @@ int gen_cnode_module_load( int argc,
         //Attempt to initialize the module
         rc = gen_cnode_module_load_init( module );
         if( rc < 0 ){
-            ei_x_format(resp, "{~a,~a,~s}", 
+            gen_cnode_format(resp, "{~a,~a,~s}", 
                         "error", "failed_to_init", fullname);
             goto load_exit;
         }
@@ -210,7 +210,7 @@ int gen_cnode_module_load( int argc,
         g_free(fullname); fullname = NULL;
     }
 
-    ei_x_format(resp, "~a", "ok");
+    gen_cnode_format(resp, "~a", "ok");
 
     load_exit:
 
@@ -262,14 +262,14 @@ int gen_cnode_module_callback( gen_cnode_callback_t* callback,
 
     if( !(module = (gen_cnode_module_t*)g_hash_table_lookup( modules, lib )) ){
         fprintf(stderr, "DEBUG: Library %s is not loaded!\n", lib);
-        ei_x_format( resp, "{~a, ~a}", "error", "lib_not_loaded" );
+        gen_cnode_format( resp, "{~a, ~a}", "error", "lib_not_loaded" );
         goto gen_cnode_module_callback_exit;
     } 
     
     fp = gen_cnode_module_lookup( lib, func, modules );
     if( !fp ){
         fprintf(stderr, "DEBUG: Function %s not defined in %s\n", func, lib);
-        ei_x_format( resp, "{~a, ~a}", "error", "symbol_dne" );
+        gen_cnode_format( resp, "{~a, ~a}", "error", "symbol_dne" );
         goto gen_cnode_module_callback_exit;
     }
 

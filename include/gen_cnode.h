@@ -7,6 +7,7 @@
 //Forward declare lib state object (
 struct gen_cnode_lib_state_s;
 
+//Function type declarations
 typedef int (*gen_cnode_fp) ( int argc,
                               char* args, 
                               struct gen_cnode_lib_state_s *state,
@@ -15,6 +16,12 @@ typedef int (*gen_cnode_fp) ( int argc,
 typedef struct gen_cnode_lib_state_s * (*gen_cnode_state_new_fp) ();
 typedef int (*gen_cnode_init_fp) ( struct gen_cnode_lib_state_s *lib_state );
 typedef int (*gen_cnode_exit_fp) ();
+
+//Externally defined helper functions
+extern int (*gen_cnode_format) (ei_x_buff* buff, const char* format, ...);
+extern void gen_cnode_notify( char* type, char* format, ...);
+extern void gen_cnode_send( erlang_pid* pid, char* format, ...);
+extern void gen_cnode_reg_send( char* name, char* format, ...);
 
 #define GEN_CNODE_REQUIRE(...)                              \
 const char* GEN_CNODE_REQUIRED( int n ){                    \
@@ -46,3 +53,4 @@ gen_cnode_fp GEN_CNODE_##NAME __attribute__ (( unused )) = NAME;       \
 int NAME( int argc, char* args, struct gen_cnode_lib_state_s *state, ei_x_buff* resp )   \
 
 #endif
+

@@ -28,5 +28,5 @@ clobber: clean
 %.o: %.c
 	$(CC) -c -o $@ $(CFLAGS) $<
 
-gen_cnode: gen_cnode_net.o gen_cnode_options.o gen_cnode_module.o gen_cnode.o
+gen_cnode: gen_cnode_net.o gen_cnode_module.o gen_cnode.o
 	$(CC) $^ $(LDFLAGS) -o $@

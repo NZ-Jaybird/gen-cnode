@@ -14,6 +14,7 @@ GEN_CNODE_STATE_NEW() {
 }
 
 GEN_CNODE_EXPORT( hello_world );
+GEN_CNODE_EXPORT( event );
 
 GEN_CNODE_DEFINE_INIT() {
     printf( "Initializing!\n");
@@ -28,6 +29,14 @@ GEN_CNODE_DEFINE_EXIT() {
 GEN_CNODE_DEFINE( hello_world ){
     printf( "Hello World!\n" );
     
-    ei_x_format(resp, "~s", "Hello World!");
+    ei_x_format_wo_ver(resp, "~s", "Hello World!");
     return (int)0;
+}
+
+GEN_CNODE_DEFINE( event ){
+
+    gen_cnode_notify("hello_world", "~s", "Hello World!");
+
+    ei_x_format_wo_ver(resp, "~a", "ok");
+    return 0;
 }
