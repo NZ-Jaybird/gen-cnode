@@ -24,7 +24,8 @@ typedef struct gen_cnode_s {
 } gen_cnode_t;
 
 /* Binds a fd to localhost:<port> and performs necessary setup work for epmd */
-int gen_cnode_net_init( char* name, 
+int gen_cnode_net_init( char* name,
+                        char* host, 
                         char* secret,
                         uint32_t port, 
                         uint16_t creation,

@@ -4,7 +4,8 @@
 #include <glib.h>
 
 typedef struct gen_cnode_opts_s {
-    gchar* name;            //(Require) Name associated with cnode.
+    gchar* name;            //(Required) Name associated with cnode.
+    gchar* host;            //(Required) Hostname associated with cnode. 
     guint16 port;           //(Required) Port on localhost on which to communicate.
     gint32 workers;         //(Optional) Number of worker threads (default unlimited).
     guint32 creation;       //(Optional) Numeric id of the node for short name mode.
@@ -40,9 +41,17 @@ extern gen_cnode_opts_t gen_cnode_opts;
     {                                                               \
         "name", 'n', 0, G_OPTION_ARG_STRING,                        \
          &(gen_cnode_opts.name),                                    \
-        "Long node name used to identify the cnode",                \
+        "Node name used to identify the cnode",                     \
         "<node_name>"                                               \
     }                                                               \
+
+#define GEN_CNODE_HOST                                              \
+    {                                                               \
+        "host", 'h', 0, G_OPTION_ARG_STRING,                        \
+         &(gen_cnode_opts.host),                                    \
+        "Host name used to identify the cnode",                     \
+        "<host_name>"                                               \
+    }   
 
 #define GEN_CNODE_COOKIE                                            \
     {                                                               \

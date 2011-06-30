@@ -41,7 +41,7 @@ typedef struct gen_cnode_event_s {
 /* Global state, allows for communcation from 
  * gen_cnode libraries to Erlang gen_cnode process */
 gen_cnode_state_t* gen_cnode_state = NULL;
-gen_cnode_opts_t gen_cnode_opts = { NULL, 0, -1, 0, NULL };
+gen_cnode_opts_t gen_cnode_opts = { NULL, NULL, 0, -1, 0, NULL };
 
 /* Define gen_cnode command line options */
 gchar gen_cnode_opt_sname[] = "gen_cnode common";
@@ -49,6 +49,7 @@ gchar gen_cnode_opt_lname[] = "gen_cnode common options:";
 gchar gen_cnode_opt_shows[] = "Show gen_cnode common options";
 GOptionEntry gen_cnode_opt_entries[] = {
     GEN_CNODE_NAME,
+    GEN_CNODE_HOST,
     GEN_CNODE_PORT,
     GEN_CNODE_WORKERS,
     GEN_CNODE_CREATION,
@@ -158,6 +159,13 @@ int gen_cnode_check_args( gen_cnode_opts_t* opts ){
         goto check_args_exit;
     }
 
+    if( !(opts->host) ){
+        rc = -EINVAL;
+        fprintf( stderr, "You must specify a host name (-n)! "
+                         "Try --help\n");
+        goto check_args_exit;
+    }
+
     if( opts->port == 0 ){
         rc = -EINVAL;
         fprintf( stderr, "You must specify a non-zero port (-p)! "
@@ -181,6 +189,7 @@ int gen_cnode_init( gen_cnode_opts_t* opts, gen_cnode_state_t* state ){
 
     //Setup localhost communication to Erlang side
     rc = gen_cnode_net_init( opts->name,
+                             opts->host,
                              opts->cookie, 
                              opts->port, 
                              opts->creation, 

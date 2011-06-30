@@ -2,7 +2,7 @@
 -behaviour(gen_server).
 
 %state of gen_cnode
--record( gen_cnode_state, {name, port, hostname, libs, workers, cnode} ).
+-record( gen_cnode_state, {name, host, port, hostname, libs, workers, cnode} ).
 
 %%gen_server callbacks
 -export( [  start_link/1,
@@ -14,9 +14,39 @@
             terminate/2   
          ] ).
 
-start_link( Args ) when is_list(Args) ->
-    gen_server:start_link({local, ?MODULE}, ?MODULE, Args, []).
+%% Defines state defaults based on whether FQDN are being used
+defaults( true ) ->
 
+    %%Just use IPv4 as all communication is over localhost
+    {ok, {A,B,C,D}} = inet:ip("localhost"),
+
+    Name = "c0",
+
+    %%Cheap hack..stitch together IP string
+    Host = integer_to_list(A) ++ "." ++ 
+           integer_to_list(B) ++ "." ++
+           integer_to_list(C) ++ "." ++
+           integer_to_list(D),
+
+    Cnode = Name ++ "@" ++ Host,
+   
+    %%<<HERE>> resolve localhost to full IP
+    #gen_cnode_state{ name=list_to_atom(Name), 
+                      host=list_to_atom(Host),
+                      port=30000, 
+                      workers=0,
+                      libs=[], 
+                      cnode=list_to_atom(Cnode) };
+
+defaults( false ) ->
+    #gen_cnode_state{ name='c0', 
+                      host='localhost',
+                      port=30000, 
+                      workers=0,
+                      libs=[], 
+                      cnode='c0_cnode@localhost' }.
+
+%% Individual argument parsing
 parse_arg( {workers, Workers}, State ) when is_integer(Workers) ->
     State#gen_cnode_state{ workers = Workers };
 
@@ -24,7 +54,12 @@ parse_arg( {libs, Libs}, State ) when is_list(Libs) ->
     State#gen_cnode_state{ libs = Libs };
 
 parse_arg( {name, Name}, State ) when is_atom(Name) ->
-    Node = list_to_atom( atom_to_list(Name) ++ "@localhost" ),
+    Node = list_to_atom( atom_to_list(Name) ++ 
+                         "_cnode@" ++ 
+                         atom_to_list(State#gen_cnode_state.host) ),
+
+    io:format("Name: ~s, Node: ~s~n", [Name, Node]),
+
     State#gen_cnode_state{ name=Name, cnode=Node };
 
 parse_arg( {port, Port}, State ) when is_integer(Port) ->
@@ -37,10 +72,18 @@ parse_args( [], State ) -> State;
 parse_args( [H | T], State ) when is_tuple(H) ->
     parse_args(T, parse_arg( H, State )).
 
+start_link( Args ) when is_list(Args) ->
+
+    %%Initialize state by merging defaults and options
+    State = parse_args( Args, defaults(net_kernel:longnames()) ),
+    
+    gen_server:start_link({local, State#gen_cnode_state.name}, ?MODULE, State, []).
+
 %%Build up gen_cnode command based on state
 exec_gen_cnode( State ) when is_record( State, gen_cnode_state ) ->
-    Command = io_lib:format( code:priv_dir(?MODULE) ++ "/gen_cnode -n ~s -p ~w -w ~w -s ~s", 
-                                [   State#gen_cnode_state.name, 
+    Command = io_lib:format( code:priv_dir(?MODULE) ++ "/gen_cnode -n ~s -h ~s -p ~w -w ~w -s ~s", 
+                                [   State#gen_cnode_state.name,
+                                    State#gen_cnode_state.host,
                                     State#gen_cnode_state.port,
                                     State#gen_cnode_state.workers, 
                                     erlang:get_cookie() ] ),  
@@ -52,22 +95,13 @@ exec_gen_cnode( State ) when is_record( State, gen_cnode_state ) ->
                           "~n------Output: End------~n", [Out]).   
 
 %% Parse args and exec gen_cnode binary
-init( Args ) ->
-    State = parse_args( Args, #gen_cnode_state{ name='c0', 
-                                                port=30000, 
-                                                workers=0,
-                                                libs=[], 
-                                                cnode='c0@localhost' } ),
-    
+init( State ) when is_record(State, gen_cnode_state) ->
+
     %%Start gen_cnode binary and link to it
     spawn_link( fun() -> exec_gen_cnode( State ) end ),
 
     %%Shutdown gen_cnode binary on exit
     process_flag( trap_exit, true ),
-
-    %%register ourselves under State.name
-    unregister(?MODULE),
-    true = register(State#gen_cnode_state.name, self()),
 
     { ok, State }.
 

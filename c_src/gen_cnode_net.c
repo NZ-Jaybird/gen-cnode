@@ -40,14 +40,14 @@ int gen_cnode_net_bind( gen_cnode_t* node ){
     return rc;    
 }
 
-int gen_cnode_net_init( char* name, 
+int gen_cnode_net_init( char* name,
+                        char* host,
                         char* secret,
                         uint32_t port,
                         uint16_t creation,
                         gen_cnode_t* state){
     int rc = 0;
-    const char* hostname = "localhost";
-    char* node = NULL;
+    char *node = NULL, *c_name = NULL;
 
     if( !state || !name ){
         rc = -EINVAL;
@@ -67,12 +67,13 @@ int gen_cnode_net_init( char* name,
         goto gen_cnode_net_init_exit;
     }
 
-    node = g_strdup_printf("%s@%s", name, hostname);
+    c_name = g_strdup_printf("%s_%s", name, "cnode");
+    node = g_strdup_printf("%s@%s", c_name, host);
 
     //Connect to erlang runtime 
     rc = ei_connect_xinit( &(state->ec),
-                           hostname,
-                           name,
+                           host,
+                           c_name,
                            node, 
                            &(state->addr.sin_addr), 
                            secret,
@@ -93,9 +94,14 @@ int gen_cnode_net_init( char* name,
 
     gen_cnode_net_init_exit:
 
+    if( c_name ){
+        g_free(c_name);
+    }
+
     if( node ){
         g_free(node);
     }
+
     return rc;
 }
 
