@@ -499,6 +499,7 @@ int gen_cnode_handle_outgoing( gen_cnode_state_t* state, guint64 tmo ){
             ei_x_encode_atom(&msg, "event") ||
             ei_x_encode_tuple_header(&msg, 2) ||
             ei_x_encode_atom(&msg, event->type) ||
+            //ei_x_encode_string(&msg, "TEST!") )
             ei_x_append(&msg, &(event->data)) )
         {
             ei_x_free(&msg);
@@ -723,39 +724,23 @@ void gen_cnode_handle_callback( gen_cnode_callback_t* callback,
 
 int (*gen_cnode_format)(ei_x_buff* buff, const char* format, ...) = ei_x_format_wo_ver;
 
-void gen_cnode_reg_send( char* name, char* format, ...){
-
-
-}
-
-void gen_cnode_send( erlang_pid* to, char* format, ... ){
-
-
-
-}
-
-void gen_cnode_notify( char* type, char* format, ...){
+void gen_cnode_notify( const char* type, ei_x_buff* data ){
     gen_cnode_event_t* event = NULL; 
-    va_list args;
 
-    if( !type || !format ){
+    if( !type || !data ){
         return;
     }
-
-    va_start(args, format);
 
     //Format a new event object
     event = g_new0(gen_cnode_event_t, 1);
 
-    event->type = g_strdup(type);
-    
     ei_x_new(&(event->data));
-    ei_x_format_wo_ver(&(event->data), format, args); 
+
+    event->type = g_strdup(type);
+    ei_x_append(&(event->data), data);
 
     //Push the event onto the event queue for later processing
     g_async_queue_push(gen_cnode_state->eventQueue, event);
-
-    va_end(args);
 }
 
 /*********** Built-in Functions *************/

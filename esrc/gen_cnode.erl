@@ -177,8 +177,8 @@ handle_cast( {Actor, Lib, Func, Args}, State ) when is_atom(Actor) and
 
 
 %% Event dispatcher for the C side
-handle_cast( {event, {_Type,Data}}, State ) ->
-   io:format("Got event!! ~p~n", [Data]),
+handle_cast( {event, Msg}, State ) ->
+   io:format("Got event!! ~p~n", [Msg]),
    {noreply, State}; 
 
 handle_cast( stop, State ) -> {stop, normal, State};

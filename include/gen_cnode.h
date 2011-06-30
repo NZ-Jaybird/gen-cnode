@@ -19,9 +19,9 @@ typedef int (*gen_cnode_exit_fp) ();
 
 //Externally defined helper functions
 extern int (*gen_cnode_format) (ei_x_buff* buff, const char* format, ...);
-extern void gen_cnode_notify( char* type, char* format, ...);
-extern void gen_cnode_send( erlang_pid* pid, char* format, ...);
-extern void gen_cnode_reg_send( char* name, char* format, ...);
+extern void gen_cnode_notify( const char* type, ei_x_buff* data );
+extern void gen_cnode_send( erlang_pid* pid, const char* format, ...);
+extern void gen_cnode_reg_send( const char* name, const char* format, ...);
 
 #define GEN_CNODE_REQUIRE(...)                              \
 const char* GEN_CNODE_REQUIRED( int n ){                    \

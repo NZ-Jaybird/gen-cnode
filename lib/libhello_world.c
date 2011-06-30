@@ -28,15 +28,22 @@ GEN_CNODE_DEFINE_EXIT() {
 
 GEN_CNODE_DEFINE( hello_world ){
     printf( "Hello World!\n" );
-    
-    ei_x_format_wo_ver(resp, "~s", "Hello World!");
+   
+    gen_cnode_format(resp, "~s", "Hello World!");
     return (int)0;
 }
 
 GEN_CNODE_DEFINE( event ){
+    ei_x_buff event = {0};
 
-    gen_cnode_notify("hello_world", "~s", "Hello World!");
+    ei_x_new(&event);
 
-    ei_x_format_wo_ver(resp, "~a", "ok");
+    gen_cnode_format(&event, "~s", "Hello World!");
+
+    gen_cnode_notify("hello_world", &event);
+
+    gen_cnode_format(resp, "~a", "ok");
+
+    ei_x_free(&event);
     return 0;
 }
