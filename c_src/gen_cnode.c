@@ -61,7 +61,6 @@ GOptionEntry gen_cnode_opt_entries[] = {
 int gen_cnode_load( int, char*, gen_cnode_state_t*, ei_x_buff* );
 int gen_cnode_stop( int, char*, gen_cnode_state_t*, ei_x_buff* );
 int gen_cnode_ping( int, char*, gen_cnode_state_t*, ei_x_buff* );
-int gen_cnode_link( int, char*, gen_cnode_state_t*, ei_x_buff* );
 
 static gen_cnode_bif_t* gen_cnode_bifs[] = {
         &(gen_cnode_bif_t){ "load", (gen_cnode_fp)gen_cnode_load },

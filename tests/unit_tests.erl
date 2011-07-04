@@ -3,6 +3,7 @@
 -import( gen_cnode ).
 
 -export( [ start/0,
+           stop/0,
            callrate/1,
            callrate_erl/1 ] ).
 
@@ -14,6 +15,8 @@ start( ) ->
     %%load the test library
     ok = gen_server:call( test, {load, test} ).
 
+stop() ->
+    gen_server:cast( test, stop ).
 
 %Generates a certain number of gen_cnode pings
 ping_cnode( Max, Max ) -> ok;

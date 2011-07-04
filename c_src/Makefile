@@ -25,7 +25,7 @@ clean:
 clobber: clean
 	rm -f $(BIN_TARGETS)
 
-%.o: %.c
+%.o: %.c %.h
 	$(CC) -c -o $@ $(CFLAGS) $<
 
 gen_cnode: gen_cnode_net.o gen_cnode_module.o gen_cnode.o
