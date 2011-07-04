@@ -1,6 +1,6 @@
 include ../Makedefs
 
-LIB_TARGETS := libhello_world.so libhello_world_cpp.so
+LIB_TARGETS := libtest.so
 
 CFLAGS += -I../include
 CFLAGS += -I$(ERL_INTERFACE_INCLUDE)
@@ -25,16 +25,9 @@ clean:
 clobber: clean
 	rm -f $(LIB_TARGETS)
 
-libhello_world_cpp.o: libhello_world.cpp
-	$(CPP) -c -o $@ $(CFLAGS) $<
-
-libhello_world_cpp.so: CFLAGS += -fPIC
-libhello_world_cpp.so: libhello_world_cpp.o
-	$(CPP) $(LDFLAGS) $^ $(LFLAGS) -o $@
-
-libhello_world.o: libhello_world.c
+libtest.o: libtest.c
 	$(CC) -c -o $@ $(CFLAGS) $<
 
-libhello_world.so: CFLAGS += -fPIC
-libhello_world.so: libhello_world.o
+libtest.so: CFLAGS += -fPIC
+libtest.so: libtest.o
 	$(CC) $(LDFLAGS) $^ $(LFLAGS) -o $@

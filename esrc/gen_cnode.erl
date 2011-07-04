@@ -76,7 +76,7 @@ start_link( Args ) when is_list(Args) ->
 
     %%Initialize state by merging defaults and options
     State = parse_args( Args, defaults(net_kernel:longnames()) ),
-    
+   
     gen_server:start_link({local, State#gen_cnode_state.name}, ?MODULE, State, []).
 
 %%Build up gen_cnode command based on state
@@ -94,20 +94,41 @@ exec_gen_cnode( State ) when is_record( State, gen_cnode_state ) ->
                           "~s"
                           "~n------Output: End------~n", [Out]).   
 
+handshake( Max, Max, _Timeout, _State ) -> 
+    { stop, "Failed to connect to C process!" };
+handshake( Tries, Max, Timeout, State ) ->
+    
+    Tag = erlang:make_ref(),
+
+    %%Handshake, block until C side is fully functional
+    {any, State#gen_cnode_state.cnode} ! { parent, {self(), Tag}, {gen_cnode, ping, []} },
+   
+    %% Wait for response 
+    receive
+        {Tag, pong} -> 
+            { ok, State }
+        after Timeout ->
+            handshake( Tries + 1, Max, Timeout, State )
+    end.
+
 %% Parse args and exec gen_cnode binary
 init( State ) when is_record(State, gen_cnode_state) ->
-
-    %%Start gen_cnode binary and link to it
-    spawn_link( fun() -> exec_gen_cnode( State ) end ),
 
     %%Shutdown gen_cnode binary on exit
     process_flag( trap_exit, true ),
 
-    { ok, State }.
+    %%Start gen_cnode binary and link to it
+    spawn_link( fun() -> exec_gen_cnode( State ) end ),
+
+    handshake( 0, 10, 100, State ).
 
 %%%%%%%%%%   GEN_SEVER CALLS %%%%%%%%%%%%%%%
 
 %% Signal gen_cnode process to load the specified library
+
+handle_call( ping, _From, State ) ->
+    { reply, pong, State };
+
 handle_call( {load, Lib}, _From, State ) when is_atom( Lib ) ->
     {any, State#gen_cnode_state.cnode} ! {parent, _From, {gen_cnode, load, [Lib]}},
     {noreply, State};

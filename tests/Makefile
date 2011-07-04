@@ -1,6 +1,7 @@
+include ../Makedefs
+
 ERL_FILES := $(wildcard *.erl)
 BEAM_TARGETS := $(addsuffix .beam, $(basename $(ERL_FILES)))
-APP_TARGETS := $(wildcard *.app)
 
 default: all
 
@@ -15,6 +16,8 @@ clean:
 
 clobber: clean ;
 
-install: ;
+install: all
+	install -m 0755 $(ERL_FILES) $(SRC_DIR)
+	install -m 0755 $(BEAM_TARGETS) $(EBIN_DIR)
 
 uninstall: ;

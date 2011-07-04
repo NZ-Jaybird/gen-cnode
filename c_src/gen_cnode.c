@@ -18,7 +18,7 @@
 typedef struct gen_cnode_state_s {
     int erl_fd;                 //FD for outgoing messages
     gboolean running;           //Have we received a stop commmand?
-    gboolean receiving;
+    gboolean receiving;         //Is the connection to erlang side active?
     gen_cnode_t node;           //Node network specifics: fd, addr_in, ei_cnode
     gen_cnode_opts_t* opts;     //gen_cnode options
     GThread* msgThread;         //Erlang message handler
@@ -60,11 +60,13 @@ GOptionEntry gen_cnode_opt_entries[] = {
 //gen_cnode BIFs
 int gen_cnode_load( int, char*, gen_cnode_state_t*, ei_x_buff* );
 int gen_cnode_stop( int, char*, gen_cnode_state_t*, ei_x_buff* );
+int gen_cnode_ping( int, char*, gen_cnode_state_t*, ei_x_buff* );
 int gen_cnode_link( int, char*, gen_cnode_state_t*, ei_x_buff* );
 
 static gen_cnode_bif_t* gen_cnode_bifs[] = {
         &(gen_cnode_bif_t){ "load", (gen_cnode_fp)gen_cnode_load },
         &(gen_cnode_bif_t){ "stop", (gen_cnode_fp)gen_cnode_stop },
+        &(gen_cnode_bif_t){ "ping", (gen_cnode_fp)gen_cnode_ping }, 
         NULL 
 };
 
@@ -471,15 +473,13 @@ bool gen_cnode_msg2cb( char* msg,
     return isvalid;
 }
 
-int gen_cnode_handle_outgoing( gen_cnode_state_t* state, guint64 tmo ){
+int gen_cnode_handle_outgoing( gen_cnode_state_t* state ){
     int rc = 0;
     gen_cnode_event_t* event = NULL;
     ei_x_buff msg = {0}; 
-    GTimeVal tmoVal;
 
     //Wait a bit for an event, if none loop
-    g_get_current_time(&tmoVal), g_time_val_add(&tmoVal, tmo);
-    if( (event = ((gen_cnode_event_t*)g_async_queue_timed_pop(state->eventQueue, &tmoVal))) ){
+    if( (event = ((gen_cnode_event_t*)g_async_queue_try_pop(state->eventQueue))) ){
          
         //Attempt to allocate space for an ei_x_buff
         if( ei_x_new(&msg) ){
@@ -499,7 +499,6 @@ int gen_cnode_handle_outgoing( gen_cnode_state_t* state, guint64 tmo ){
             ei_x_encode_atom(&msg, "event") ||
             ei_x_encode_tuple_header(&msg, 2) ||
             ei_x_encode_atom(&msg, event->type) ||
-            //ei_x_encode_string(&msg, "TEST!") )
             ei_x_append(&msg, &(event->data)) )
         {
             ei_x_free(&msg);
@@ -629,7 +628,7 @@ int gen_cnode_handle_incoming( gen_cnode_state_t* state, guint64 tmo ){
 
 int gen_cnode_handle_connection( gen_cnode_state_t* state ){
     int rc = 0;
-    guint64 tmo = 10;
+    guint64 tmo = 5;
     ErlConnect info;
 
 
@@ -661,7 +660,7 @@ int gen_cnode_handle_connection( gen_cnode_state_t* state ){
             } 
    
             //Check for outgoing messages 
-            if( (rc = gen_cnode_handle_outgoing( state, tmo )) ){
+            if( (rc = gen_cnode_handle_outgoing( state )) ){
                 fprintf(stderr, "Error occurred when handling incoming message...\n");
                 state->running = false;
                 break;
@@ -691,7 +690,7 @@ void gen_cnode_handle_callback( gen_cnode_callback_t* callback,
 
     if( !callback->cast && reply.index ){
      
-        //<<HERE>> Format return message at {Tag, Reply}
+        //Format return message at {Tag, Reply}
         ei_x_new(&resp);
 
         if( ei_x_encode_version(&resp) ||
@@ -699,7 +698,6 @@ void gen_cnode_handle_callback( gen_cnode_callback_t* callback,
             ei_x_encode_ref(&resp, &(callback->tag)) ||
          
             //Append callback reply
-            //ei_x_encode_atom(&resp, "ok") )
             ei_x_append(&resp, &reply) )
         {
             fprintf( stderr, "Failed to encode response!\n");
@@ -761,5 +759,11 @@ int gen_cnode_stop( int argc,
     return 0;
 }
 
-
-
+int gen_cnode_ping( int argc, 
+                    char* args, 
+                    gen_cnode_state_t* state, 
+                    ei_x_buff* resp )
+{
+    gen_cnode_format(resp, "~a", "pong");
+    return 0;
+}
