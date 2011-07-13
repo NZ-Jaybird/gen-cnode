@@ -3,7 +3,6 @@
 
 #include "erl_interface.h"
 #include "ei.h"
-
 //Forward declare lib state object (
 struct gen_cnode_lib_state_s;
 
@@ -17,11 +16,20 @@ typedef struct gen_cnode_lib_state_s * (*gen_cnode_state_new_fp) ();
 typedef int (*gen_cnode_init_fp) ( struct gen_cnode_lib_state_s *lib_state );
 typedef int (*gen_cnode_exit_fp) ();
 
+
+
 //Externally defined helper functions
+
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 extern int (*gen_cnode_format) (ei_x_buff* buff, const char* format, ...);
 extern void gen_cnode_notify( const char* type, ei_x_buff* data );
-extern void gen_cnode_send( erlang_pid* pid, const char* format, ...);
-extern void gen_cnode_reg_send( const char* name, const char* format, ...);
+#ifdef __cplusplus
+}
+#endif 
+
 
 #define GEN_CNODE_REQUIRE(...)                              \
 const char* GEN_CNODE_REQUIRED( int n ){                    \
