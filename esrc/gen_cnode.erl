@@ -203,12 +203,13 @@ handle_cast( {Actor, Lib, Func, Args}, State ) when is_atom(Actor) and
 
 
 %% Event dispatcher for the C side
-handle_cast( {event, Msg}, State ) when State#gen_cnode_state.event_manager == nil ->
-   io:format("Dropping event!! ~p~n", [Msg]),
-   {noreply, State}; 
+handle_cast( {event, Msg}, State ) when State#gen_cnode_state.event_manager /= nil ->
+    io:format("Forwarding event!! ~p~n", [Msg]),
+    gen_event:notify(State#gen_cnode_state.event_manager, Msg),
+    {noreply, State}; 
 
 handle_cast( {event, Msg}, State ) ->
-   io:format("Forwarding event!! ~p~n", [Msg]),
+   io:format("Dropping event!! ~p~n", [Msg]),
    {noreply, State}; 
 
 handle_cast( stop, State ) -> {stop, normal, State};
