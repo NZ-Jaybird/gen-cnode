@@ -2,7 +2,7 @@
 -behaviour(gen_server).
 
 %state of gen_cnode
--record( gen_cnode_state, {name, host, port, hostname, libs, workers, cnode} ).
+-record( gen_cnode_state, {name, host, port, hostname, libs, workers, cnode, event_manager} ).
 
 %%gen_server callbacks
 -export( [  start_link/1,
@@ -36,7 +36,8 @@ defaults( true ) ->
                       port=30000, 
                       workers=0,
                       libs=[], 
-                      cnode=list_to_atom(Cnode) };
+                      cnode=list_to_atom(Cnode),
+                      event_manager = nil };
 
 defaults( false ) ->
     #gen_cnode_state{ name='c0', 
@@ -44,7 +45,8 @@ defaults( false ) ->
                       port=30000, 
                       workers=0,
                       libs=[], 
-                      cnode='c0_cnode@localhost' }.
+                      cnode='c0_cnode@localhost',
+                      event_manager = nil }.
 
 %% Individual argument parsing
 parse_arg( {workers, Workers}, State ) when is_integer(Workers) ->
@@ -64,6 +66,9 @@ parse_arg( {name, Name}, State ) when is_atom(Name) ->
 
 parse_arg( {port, Port}, State ) when is_integer(Port) ->
     State#gen_cnode_state{ port=Port };
+
+parse_arg( {event_manager, Manager}, State ) when is_atom(Manager) ->
+    State#gen_cnode_state{ event_manager=Manager };
 
 parse_arg( Unknown, State ) when is_tuple( Unknown ) -> State.
 
@@ -198,8 +203,12 @@ handle_cast( {Actor, Lib, Func, Args}, State ) when is_atom(Actor) and
 
 
 %% Event dispatcher for the C side
+handle_cast( {event, Msg}, State ) when State#gen_cnode_state.event_manager == nil ->
+   io:format("Dropping event!! ~p~n", [Msg]),
+   {noreply, State}; 
+
 handle_cast( {event, Msg}, State ) ->
-   io:format("Got event!! ~p~n", [Msg]),
+   io:format("Forwarding event!! ~p~n", [Msg]),
    {noreply, State}; 
 
 handle_cast( stop, State ) -> {stop, normal, State};
