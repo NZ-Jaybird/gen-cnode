@@ -35,7 +35,7 @@ typedef struct gen_cnode_bif_s {
 
 typedef struct gen_cnode_event_s {
     gchar* type;
-    ei_x_buff data;
+    ei_x_buff* data;
 } gen_cnode_event_t;
 
 /* Global state, allows for communcation from 
@@ -332,7 +332,10 @@ void gen_cnode_free_event( gen_cnode_event_t* event ){
         g_free(event->type);
     }
 
-    ei_x_free(&(event->data));
+    if( event->data ){
+        ei_x_free(event->data);
+        g_free(event->data);
+    }
 
     g_free(event);
 }
@@ -488,22 +491,41 @@ int gen_cnode_handle_outgoing( gen_cnode_state_t* state ){
             goto exit;
         }
 
-        //Attempt to encode erlang message 
         if( ei_x_encode_version(&msg) ||
             ei_x_encode_tuple_header(&msg, 2) ||
             ei_x_encode_atom(&msg,"$gen_cast") ||
             
             //Event data start
             ei_x_encode_tuple_header(&msg, 2) ||
-            ei_x_encode_atom(&msg, "event") ||
-            ei_x_encode_tuple_header(&msg, 2) ||
-            ei_x_encode_atom(&msg, event->type) ||
-            ei_x_append(&msg, &(event->data)) )
+            ei_x_encode_atom(&msg, "event") )
+
         {
             ei_x_free(&msg);
             gen_cnode_free_event(event);
             fprintf(stderr, "Failed to encode event!!\n");
             goto exit;
+        }
+
+        if( event->data ){
+
+            if( ei_x_encode_tuple_header(&msg, 2) ||
+                ei_x_encode_atom(&msg, event->type) ||
+                ei_x_append(&msg, event->data) )
+            {
+                ei_x_free(&msg);
+                gen_cnode_free_event(event);
+                fprintf(stderr, "Failed to encode event data!!\n");
+                goto exit;
+            }
+
+        } else {
+
+            if( ei_x_encode_atom(&msg, event->type) ){
+                ei_x_free(&msg);
+                gen_cnode_free_event(event);
+                fprintf(stderr, "Failed to encode event type!!\n");
+                goto exit;
+            }
         }
 
         /* Send the event notification to the name provided,
@@ -724,17 +746,21 @@ int (*gen_cnode_format)(ei_x_buff* buff, const char* format, ...) = ei_x_format_
 void gen_cnode_notify( const char* type, ei_x_buff* data ){
     gen_cnode_event_t* event = NULL; 
 
-    if( !type || !data ){
+    if( !type ){
         return;
     }
 
     //Format a new event object
     event = g_new0(gen_cnode_event_t, 1);
 
-    ei_x_new(&(event->data));
-
     event->type = g_strdup(type);
-    ei_x_append(&(event->data), data);
+    
+    if( data ){
+        event->data = (ei_x_buff*)g_new0(ei_x_buff, 1);
+
+        ei_x_new(event->data);
+        ei_x_append(event->data, data);
+    }
 
     //Push the event onto the event queue for later processing
     g_async_queue_push(gen_cnode_state->eventQueue, event);
