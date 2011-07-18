@@ -175,6 +175,14 @@ handle_call( _Request, _From, State ) ->
 
 
 %%%%%%%%%%   GEN_SEVER CASTS %%%%%%%%%%%%%%%
+%% Event dispatcher for the C side
+handle_cast( {event, Msg}, State ) when State#gen_cnode_state.event_manager /= nil ->
+    gen_event:notify(State#gen_cnode_state.event_manager, Msg),
+    {noreply, State}; 
+
+handle_cast( {event, _Msg}, State ) ->
+   {noreply, State}; 
+
 handle_cast( {Lib, Func}, State ) when is_atom(Lib) and
                                        is_atom(Func) ->
     {any, State#gen_cnode_state.cnode} ! { parent, {Lib, Func, []} },
@@ -200,15 +208,6 @@ handle_cast( {Actor, Lib, Func, Args}, State ) when is_atom(Actor) and
 
     {any, State#gen_cnode_state.cnode} ! { Actor, {Lib, Func, Args} },
     {noreply, State};
-
-
-%% Event dispatcher for the C side
-handle_cast( {event, Msg}, State ) when State#gen_cnode_state.event_manager /= nil ->
-    gen_event:notify(State#gen_cnode_state.event_manager, Msg),
-    {noreply, State}; 
-
-handle_cast( {event, Msg}, State ) ->
-   {noreply, State}; 
 
 handle_cast( stop, State ) -> {stop, normal, State};
 
