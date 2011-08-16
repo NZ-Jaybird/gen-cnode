@@ -173,7 +173,7 @@ int gen_cnode_module_load( int argc,
         //Attempt to load the module
         lib = g_module_open( fullname, (GModuleFlags)(G_MODULE_BIND_LAZY | G_MODULE_BIND_LOCAL) );
         if( !lib ){
-            gen_cnode_format(resp, "{~a,~a,~s}", "error", "not_found", lib_name);
+            gen_cnode_format(resp, "{~a,~a,~s}", "error", "failed_to_load", g_module_error());
             goto load_exit;
         }
 
