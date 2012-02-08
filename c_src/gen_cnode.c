@@ -624,8 +624,8 @@ int gen_cnode_handle_incoming( gen_cnode_state_t* state, guint64 tmo ){
         goto exit;
     }
 
-    fprintf( stderr, "lib: %s, func: %s, argc: %d\n", 
-             callback->lib, callback->func, callback->argc );
+    //fprintf( stderr, "lib: %s, func: %s, argc: %d\n", 
+    //         callback->lib, callback->func, callback->argc );
 
     /* If callback is to be handled by worker pool and 
      * such a pool exists, hand callback to workers. */
