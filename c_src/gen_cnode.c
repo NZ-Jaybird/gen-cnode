@@ -250,6 +250,8 @@ int gen_cnode_init( gen_cnode_opts_t* opts, gen_cnode_state_t* state ){
     //Setup event queue
     state->eventQueue = g_async_queue_new_full((GDestroyNotify)gen_cnode_free_event);
 
+    state->running = TRUE;
+
     /* Start message receive thread.  Parent thread becomes
      * responsible for handling inline callbacks */
     state->msgThread = g_thread_create( (GThreadFunc)gen_cnode_handle_connection,
@@ -258,7 +260,7 @@ int gen_cnode_init( gen_cnode_opts_t* opts, gen_cnode_state_t* state ){
                                         NULL );
     if( !state->msgThread ){
         rc = -1;
-        fprintf( stderr, "Failed to create message receive thread!\n" );
+        fprintf( stderr, "Failed to create message processing thread!\n" );
         goto gen_cnode_init_exit;
     }
 
@@ -276,7 +278,7 @@ int gen_cnode_init( gen_cnode_opts_t* opts, gen_cnode_state_t* state ){
 
     /* Several threads use this to monitor state, set to true
      * now to avoid race conditions. */
-    state->running = TRUE;
+
     
     gen_cnode_init_exit:
     return rc;
@@ -477,78 +479,91 @@ bool gen_cnode_msg2cb( char* msg,
 
 int gen_cnode_handle_outgoing( gen_cnode_state_t* state ){
     int rc = 0;
+    GTimeVal tmo;
     gen_cnode_event_t* event = NULL;
     ei_x_buff msg = {0}; 
 
-    //Wait a bit for an event, if none loop
-    if( (event = ((gen_cnode_event_t*)g_async_queue_try_pop(state->eventQueue))) ){
-         
-        //Attempt to allocate space for an ei_x_buff
-        if( ei_x_new(&msg) ){
-            rc = -ENOMEM;
-            gen_cnode_free_event(event);
-            fprintf(stderr, "Failed to allocate xbuffer!\n");
-            goto exit;
-        }
+    g_async_queue_ref( state->eventQueue ); 
 
-        if( ei_x_encode_version(&msg) ||
-            ei_x_encode_tuple_header(&msg, 2) ||
-            ei_x_encode_atom(&msg,"$gen_cast") ||
-            
-            //Event data start
-            ei_x_encode_tuple_header(&msg, 2) ||
-            ei_x_encode_atom(&msg, "event") )
+    while( state->running ){
 
-        {
-            ei_x_free(&msg);
-            gen_cnode_free_event(event);
-            fprintf(stderr, "Failed to encode event!!\n");
-            goto exit;
-        }
+        //Wait a bit for an event, if none loop
+        g_get_current_time(&tmo), g_time_val_add(&tmo, 100);
+        if( (event = ((gen_cnode_event_t*)g_async_queue_timed_pop(state->eventQueue, &tmo))) ){
+             
+            //Attempt to allocate space for an ei_x_buff
+            if( ei_x_new(&msg) ){
+                rc = -ENOMEM;
+                gen_cnode_free_event(event);
+                fprintf(stderr, "Failed to allocate xbuffer!\n");
+                goto exit;
+            }
 
-        if( event->data ){
+            if( ei_x_encode_version(&msg) ||
+                ei_x_encode_tuple_header(&msg, 2) ||
+                ei_x_encode_atom(&msg,"$gen_cast") ||
+                
+                //Event data start
+                ei_x_encode_tuple_header(&msg, 2) ||
+                ei_x_encode_atom(&msg, "event") )
 
-            if( ei_x_encode_tuple_header(&msg, 2) ||
-                ei_x_encode_atom(&msg, event->type) ||
-                ei_x_append(&msg, event->data) )
+            {
+                rc = -EINVAL;
+                ei_x_free(&msg);
+                gen_cnode_free_event(event);
+                fprintf(stderr, "Failed to encode event!!\n");
+                goto exit;
+            }
+
+            if( event->data ){
+
+                if( ei_x_encode_tuple_header(&msg, 2) ||
+                    ei_x_encode_atom(&msg, event->type) ||
+                    ei_x_append(&msg, event->data) )
+                {
+                    rc = EINVAL;
+                    ei_x_free(&msg);
+                    gen_cnode_free_event(event);
+                    fprintf(stderr, "Failed to encode event data!!\n");
+                    goto exit;
+                }
+
+            } else {
+
+                if( ei_x_encode_atom(&msg, event->type) ){
+                    rc = -EINVAL;
+                    ei_x_free(&msg);
+                    gen_cnode_free_event(event);
+                    fprintf(stderr, "Failed to encode event type!!\n");
+                    goto exit;
+                }
+            }
+
+            /* Send the event notification to the name provided,
+             * trusting that the erlang side is registered under it. */ 
+            if( (rc = ei_reg_send(&(state->node.ec), state->erl_fd, 
+                                  gen_cnode_opts.name, msg.buff, msg.buffsz)) )
             {
                 ei_x_free(&msg);
                 gen_cnode_free_event(event);
-                fprintf(stderr, "Failed to encode event data!!\n");
+                fprintf(stderr, "Failed to send event to registered node!\n");
                 goto exit;
             }
 
-        } else {
-
-            if( ei_x_encode_atom(&msg, event->type) ){
-                ei_x_free(&msg);
-                gen_cnode_free_event(event);
-                fprintf(stderr, "Failed to encode event type!!\n");
-                goto exit;
-            }
-        }
-
-        /* Send the event notification to the name provided,
-         * trusting that the erlang side is registered under it. */ 
-        if( (rc = ei_reg_send(&(state->node.ec), state->erl_fd, 
-                              gen_cnode_opts.name, msg.buff, msg.buffsz)) )
-        {
+            //Cleanup
             ei_x_free(&msg);
             gen_cnode_free_event(event);
-            fprintf(stderr, "Failed to send event to registered node!\n");
-            goto exit;
         }
 
-        //Cleanup
-        ei_x_free(&msg);
-        gen_cnode_free_event(event);
     }
 
     exit:
+    
+    g_async_queue_unref( state->eventQueue );  
     return rc;
 }
 
-int gen_cnode_handle_incoming( gen_cnode_state_t* state, guint64 tmo ){
+int gen_cnode_handle_incoming( gen_cnode_state_t* state ){
     int rc = 0;
     guint32 num_bytes = 0;
     ei_x_buff xbuffer = {0};
@@ -556,106 +571,113 @@ int gen_cnode_handle_incoming( gen_cnode_state_t* state, guint64 tmo ){
     gen_cnode_callback_t* callback = NULL;
     GError* error = NULL;
 
-    if( (rc = ei_x_new(&xbuffer)) ){
-        fprintf(stderr, "Failed to allocate xbuffer!\n");
-        goto exit;
-    }
+    //Reference the inline queue
+    g_async_queue_ref( state->parentQueue );
 
-    //Check for messages from erlang process
-    num_bytes = ei_xreceive_msg_tmo( state->erl_fd, 
-                                     &erl_msg, 
-                                     &xbuffer,
-                                     tmo );
-    
-    //Check for error conditions 
-    if( num_bytes == ERL_ERROR ){
+    while( state->receiving ){
+
+        if( (rc = ei_x_new(&xbuffer)) ){
+            fprintf(stderr, "Failed to allocate xbuffer!\n");
+            goto exit;
+        }
+
+        //Check for messages from erlang process
+        num_bytes = ei_xreceive_msg_tmo( state->erl_fd, 
+                                         &erl_msg, 
+                                         &xbuffer,
+                                         100 );
         
-        switch(erl_errno){
-           
-            case EAGAIN: //Timeout not considered fatal error, cleanup and exit
-            case ETIMEDOUT:
+        //Check for error conditions 
+        if( num_bytes == ERL_ERROR ){
+            
+            switch(erl_errno){
+               
+                case EAGAIN: //Timeout not considered fatal error
+                case ETIMEDOUT:
+                    ei_x_free(&xbuffer);
+                    continue;
+
+                default:    //Something else went wrong
+                    rc = erl_errno;
+                    ei_x_free(&xbuffer);
+                    fprintf(stderr, "ei_xreceive_msg_tmo failed! erl_errno = %d!\n", erl_errno);
+                    goto exit;
+            }
+        }
+
+        //Handle messages based on type
+        switch( erl_msg.msgtype ){
+
+            case ERL_SEND:      //Regular message, continue on...
+            case ERL_REG_SEND:
+                break;
+
+            case ERL_LINK:      //<<HERE>> Investigate further
+            case ERL_UNLINK:
+                ei_x_free(&xbuffer);
+                continue;
+
+            case ERL_TICK:  //Heartbeat
+                ei_x_free(&xbuffer);
+                continue;
+            
+            case ERL_ERROR: //Something bad happened..timeout, etc...
+                rc = -num_bytes;
+                ei_x_free(&xbuffer);
+                fprintf( stderr, "Error message received!\n" );
+                goto exit;
+
+            case ERL_EXIT:  //Link to erlang side broken, exit normally
+                ei_x_free(&xbuffer);
+                goto exit; 
+
+            default:
+                rc = -EINVAL;
+                ei_x_free(&xbuffer);
+                fprintf( stderr, "Received unrecognized message type!\n" );
                 ei_x_free(&xbuffer);
                 goto exit;
-
-            default:    //Something else went wrong
-                rc = erl_errno;
-                fprintf(stderr, "ei_xreceive_msg_tmo failed! erl_errno = %d!\n", erl_errno);
-                goto exit;
         }
-    }
 
-    //Handle messages based on type
-    switch( erl_msg.msgtype ){
-
-        
-        case ERL_SEND:      //Regular message, continue on...
-        case ERL_REG_SEND:
-            break;
-
-        case ERL_LINK:      //<<HERE>> Investigate further
-        case ERL_UNLINK:
+        //Attempt to convert message into a callback
+        callback = g_new0( gen_cnode_callback_t, 1 );
+        if( !gen_cnode_msg2cb( xbuffer.buff, num_bytes, callback ) ){
             ei_x_free(&xbuffer);
-            printf("DEBUG: LINK/UNLIK!\n");
+            gen_cnode_free_callback(callback);
             goto exit;
-
-        case ERL_TICK:  //Heartbeat
-            ei_x_free(&xbuffer);
-            goto exit;
-        
-        case ERL_ERROR: //Something bad happened..timeout, etc...
-            rc = -num_bytes;
-            fprintf( stderr, "Error message received!\n" );
-            goto exit;
-
-        case ERL_EXIT:  //Link to erlang side broken, exit normally
-            goto exit; 
-
-        default:
-            fprintf( stderr, "HUH?!\n" );
-            ei_x_free(&xbuffer);
-            goto exit;
-    }
-
-    //Attempt to convert message into a callback
-    callback = g_new0( gen_cnode_callback_t, 1 );
-    if( !gen_cnode_msg2cb( xbuffer.buff, num_bytes, callback ) ){
-        ei_x_free(&xbuffer);
-        gen_cnode_free_callback(callback);
-        goto exit;
-    }
-
-    //fprintf( stderr, "lib: %s, func: %s, argc: %d\n", 
-    //         callback->lib, callback->func, callback->argc );
-
-    /* If callback is to be handled by worker pool and 
-     * such a pool exists, hand callback to workers. */
-    if( !callback->parent && state->worker_pool ){
-        
-        g_thread_pool_push( state->worker_pool, (gpointer)callback, &error );
-        if( error ){
-            rc = -1;
-            fprintf( stderr, "g_thread_pool_push failed!\n");
-            fprintf( stderr, "%s\n", error->message);
-            g_error_free(error);
         }
-    } else { //Otherwise, hand callback to the parent for inline processing
 
-        g_async_queue_push( state->parentQueue, callback );
+        //fprintf( stderr, "lib: %s, func: %s, argc: %d\n", 
+        //         callback->lib, callback->func, callback->argc );
+
+        /* If callback is to be handled by worker pool and 
+         * such a pool exists, hand callback to workers. */
+        if( !callback->parent && state->worker_pool ){
+            
+            g_thread_pool_push( state->worker_pool, (gpointer)callback, &error );
+            if( error ){
+                rc = -1;
+                fprintf( stderr, "g_thread_pool_push failed!\n");
+                fprintf( stderr, "%s\n", error->message);
+                g_error_free(error);
+            }
+        } else { //Otherwise, hand callback to the parent for inline processing
+
+            g_async_queue_push( state->parentQueue, callback );
+        }
     }
 
     exit:
+
+    //Unreference inline queue
+    g_async_queue_unref( state->parentQueue );
+
     return rc;
 }
 
 int gen_cnode_handle_connection( gen_cnode_state_t* state ){
-    int rc = 0;
-    guint64 tmo = 5;
+    GThread *incoming = NULL, *outgoing = NULL;
     ErlConnect info;
-
-
-    //Reference the inline queue
-    g_async_queue_ref( state->parentQueue );
-    g_async_queue_ref( state->eventQueue ); 
 
     while( state->running ){
 
@@ -670,32 +692,31 @@ int gen_cnode_handle_connection( gen_cnode_state_t* state ){
 
         state->receiving = true;
 
-        //Enter tight message handling loop
-        while( state->receiving ){
+        //Spawn two threads:
+        //  One for receiving and decoding erlang -> c messages and
+        //  another for processing c -> erlang messages.
+        incoming = g_thread_create( (GThreadFunc)gen_cnode_handle_incoming,
+                                        (gpointer)state, 
+                                        TRUE,
+                                        NULL );
 
-            //Check for incoming callbacks
-            if( (rc = gen_cnode_handle_incoming( state, tmo )) ){
-                fprintf(stderr, "Error occurred when handling incoming message...\n");
-                state->running = false;
-                break;
-            } 
-   
-            //Check for outgoing messages 
-            if( (rc = gen_cnode_handle_outgoing( state )) ){
-                fprintf(stderr, "Error occurred when handling incoming message...\n");
-                state->running = false;
-                break;
-            }
+        outgoing = g_thread_create( (GThreadFunc)gen_cnode_handle_outgoing,
+                                    (gpointer) state,
+                                    TRUE,
+                                    NULL );
+
+        if( !incoming || !outgoing ){
+            fprintf( stderr, "Failed to create incoming/outgoing threads!\n" );
+            return -1;
         }
 
-        state->receiving = false;  
+        //Threads are running, simply block and wait for them to error/finish
+        g_thread_join(incoming), g_thread_join(outgoing);
+
+        state->receiving = false;
     }
 
-    //Unreference inline queue
-    g_async_queue_unref( state->parentQueue );
-    g_async_queue_unref( state->eventQueue );  
-
-    return rc; 
+    return 0; 
 }
 
 
