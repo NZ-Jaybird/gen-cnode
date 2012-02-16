@@ -110,8 +110,12 @@ handshake( Tries, Max, Timeout, State ) ->
    
     %% Wait for response 
     receive
-        {Tag, pong} -> 
-            { ok, State }
+        {Tag, {pong, _Time}} -> 
+            { ok, State };
+
+        {Tag, Something} ->
+            io:format("Got: ~p~n", [Something])
+
         after Timeout ->
             handshake( Tries + 1, Max, Timeout, State )
     end.

@@ -20,7 +20,8 @@ typedef struct gen_cnode_module_entry_s {
 
 typedef struct gen_cnode_callback_s {
     gboolean parent;                    //Is the parent thread the actor?
-    gboolean cast;                      //Is the callback as cast?
+    gboolean cast;                      //Is the callback a cast?
+    GTimer* created;                    //Timer started when cb is created.
     erlang_pid from;                    //Pid making callback
     erlang_ref tag;                     //Reference for call
     gchar lib  [MAXATOMLEN + 1];        //Library name

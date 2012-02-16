@@ -13,7 +13,7 @@ start( ) ->
     {ok, _Pid} = gen_cnode:start_link( [{name, test}, {port, 30000}, {workers, -1}] ),
 
     %%load the test library
-    ok = gen_server:call( test, {load, test} ).
+    {ok, _Time} = gen_server:call( test, {load, test} ).
 
 stop() ->
     gen_server:cast( test, stop ).
@@ -21,7 +21,8 @@ stop() ->
 %Generates a certain number of gen_cnode pings
 ping_cnode( Max, Max ) -> ok;
 ping_cnode( Call, Max ) when (Call < Max) ->
-    pong = gen_server:call( test, {gen_cnode, ping} ),
+    {pong, Time} = gen_server:call( test, {gen_cnode, ping} ),
+    io:format("Time for Call ~p: ~p~n", [Call, Time]),
     ping_cnode( Call + 1, Max ).
 
 %Tests turnaround time from erlang to cnode and back again.

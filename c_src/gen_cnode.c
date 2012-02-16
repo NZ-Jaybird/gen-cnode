@@ -317,6 +317,10 @@ void gen_cnode_free_callback( gen_cnode_callback_t* callback ) {
         return;
     }
 
+    if( callback->created ){
+        g_timer_destroy(callback->created);
+    }
+
     if( callback->msg ){
         g_free(callback->msg);
     }
@@ -356,7 +360,10 @@ bool gen_cnode_msg2cb( char* msg,
         isvalid = false;
         goto msg2cb_exit;
     } 
-   
+  
+    //Mark when the callback was created
+    callback->created = g_timer_new();
+
     //Decode magic version 
     if( (rc = ei_decode_version(msg, &index, &version)) ){
         fprintf(stderr, "NO VERISON! rc = %d\n", rc);
@@ -494,9 +501,9 @@ int gen_cnode_handle_outgoing( gen_cnode_state_t* state ){
             //Attempt to allocate space for an ei_x_buff
             if( ei_x_new(&msg) ){
                 rc = -ENOMEM;
-                gen_cnode_free_event(event);
+                state->running = false;
                 fprintf(stderr, "Failed to allocate xbuffer!\n");
-                goto exit;
+                goto cleanup;
             }
 
             if( ei_x_encode_version(&msg) ||
@@ -508,11 +515,8 @@ int gen_cnode_handle_outgoing( gen_cnode_state_t* state ){
                 ei_x_encode_atom(&msg, "event") )
 
             {
-                rc = -EINVAL;
-                ei_x_free(&msg);
-                gen_cnode_free_event(event);
                 fprintf(stderr, "Failed to encode event!!\n");
-                goto exit;
+                goto cleanup;
             }
 
             if( event->data ){
@@ -521,21 +525,15 @@ int gen_cnode_handle_outgoing( gen_cnode_state_t* state ){
                     ei_x_encode_atom(&msg, event->type) ||
                     ei_x_append(&msg, event->data) )
                 {
-                    rc = EINVAL;
-                    ei_x_free(&msg);
-                    gen_cnode_free_event(event);
                     fprintf(stderr, "Failed to encode event data!!\n");
-                    goto exit;
+                    goto cleanup;
                 }
 
             } else {
 
                 if( ei_x_encode_atom(&msg, event->type) ){
-                    rc = -EINVAL;
-                    ei_x_free(&msg);
-                    gen_cnode_free_event(event);
                     fprintf(stderr, "Failed to encode event type!!\n");
-                    goto exit;
+                    goto cleanup;
                 }
             }
 
@@ -544,21 +542,18 @@ int gen_cnode_handle_outgoing( gen_cnode_state_t* state ){
             if( (rc = ei_reg_send(&(state->node.ec), state->erl_fd, 
                                   gen_cnode_opts.name, msg.buff, msg.buffsz)) )
             {
-                ei_x_free(&msg);
-                gen_cnode_free_event(event);
+                state->running = false;
                 fprintf(stderr, "Failed to send event to registered node!\n");
-                goto exit;
             }
 
             //Cleanup
+            cleanup:
             ei_x_free(&msg);
             gen_cnode_free_event(event);
         }
 
     }
 
-    exit:
-    
     g_async_queue_unref( state->eventQueue );  
     return rc;
 }
@@ -574,7 +569,7 @@ int gen_cnode_handle_incoming( gen_cnode_state_t* state ){
     //Reference the inline queue
     g_async_queue_ref( state->parentQueue );
 
-    while( state->receiving ){
+    while( state->running ){
 
         if( (rc = ei_x_new(&xbuffer)) ){
             fprintf(stderr, "Failed to allocate xbuffer!\n");
@@ -622,20 +617,18 @@ int gen_cnode_handle_incoming( gen_cnode_state_t* state ){
                 continue;
             
             case ERL_ERROR: //Something bad happened..timeout, etc...
-                rc = -num_bytes;
-                ei_x_free(&xbuffer);
                 fprintf( stderr, "Error message received!\n" );
-                goto exit;
 
             case ERL_EXIT:  //Link to erlang side broken, exit normally
+                state->running = false;
                 ei_x_free(&xbuffer);
                 goto exit; 
 
             default:
                 rc = -EINVAL;
+                state->running = false;
                 ei_x_free(&xbuffer);
                 fprintf( stderr, "Received unrecognized message type!\n" );
-                ei_x_free(&xbuffer);
                 goto exit;
         }
 
@@ -724,6 +717,7 @@ int gen_cnode_handle_connection( gen_cnode_state_t* state ){
 void gen_cnode_handle_callback( gen_cnode_callback_t* callback, 
                                 gen_cnode_state_t* state ){
     int rc = 0;
+    gdouble secs = 0;
     ei_x_buff reply = {0}, resp = {0};
 
     ei_x_new(&reply);
@@ -731,16 +725,27 @@ void gen_cnode_handle_callback( gen_cnode_callback_t* callback,
     gen_cnode_module_callback( callback, state->modules, &reply );
 
     if( !callback->cast && reply.index ){
-     
+       
         //Format return message at {Tag, Reply}
         ei_x_new(&resp);
+
+        //Note the number of seconds and microsends it took to service the
+        //request.
+        secs = g_timer_elapsed(callback->created, NULL);
+
+        fprintf(stderr, "Secs: %f!!!!\n", (float) secs);
 
         if( ei_x_encode_version(&resp) ||
             ei_x_encode_tuple_header(&resp, 2) ||
             ei_x_encode_ref(&resp, &(callback->tag)) ||
+            ei_x_encode_tuple_header(&resp, 2) ||
          
             //Append callback reply
-            ei_x_append(&resp, &reply) )
+            ei_x_append(&resp, &reply) ||
+
+            //Encode the microsecond service time of the callback
+            ei_x_encode_ulonglong(&resp, 
+                (unsigned long long)(secs * 1e6) ) )
         {
             fprintf( stderr, "Failed to encode response!\n");
     
