@@ -733,8 +733,6 @@ void gen_cnode_handle_callback( gen_cnode_callback_t* callback,
         //request.
         secs = g_timer_elapsed(callback->created, NULL);
 
-        fprintf(stderr, "Secs: %f!!!!\n", (float) secs);
-
         if( ei_x_encode_version(&resp) ||
             ei_x_encode_tuple_header(&resp, 2) ||
             ei_x_encode_ref(&resp, &(callback->tag)) ||
