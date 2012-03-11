@@ -93,11 +93,11 @@ exec_gen_cnode( State ) when is_record( State, gen_cnode_state ) ->
                                     State#gen_cnode_state.workers, 
                                     erlang:get_cookie() ] ),  
     error_logger:info_msg("Calling: ~s~n", [ Command ]),
-    Out = os:cmd( Command ),
-    error_logger:info_msg("C process exited."
-                          "~n------Output: Start------~n"
-                          "~s"
-                          "~n------Output: End------~n", [Out]).   
+    os:cmd( Command ).
+    %error_logger:info_msg("C process exited."
+    %                      "~n------Output: Start------~n"
+    %                      "~s"
+    %                      "~n------Output: End------~n", [Out]).   
 
 handshake( Max, Max, _Timeout, _State ) -> 
     { stop, "Failed to connect to C process!" };
