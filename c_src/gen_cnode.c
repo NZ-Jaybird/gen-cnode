@@ -221,7 +221,7 @@ int gen_cnode_init( gen_cnode_opts_t* opts, gen_cnode_state_t* state ){
     //Add gen_cnode entry
     g_hash_table_insert( state->modules, (void*)"gen_cnode", (void*)bifs );
 
-    if( !g_thread_supported() ){
+    if( g_thread_supported() ){
         g_thread_init(NULL);
     } else {
         rc = -1;
