@@ -128,13 +128,9 @@ int main( int argc, char** argv ){
     /* Handle all callbacks with parent as the actor */
     while( gen_cnode_state->running ){
         gen_cnode_callback_t* cb = NULL;
-        GTimeVal tmo;
-
-        //Calculate TMO
-        g_get_current_time(&tmo), g_time_val_add(&tmo, 1000);
        
         //When a callback arrives, perform the action 
-        cb = (gen_cnode_callback_t*)g_async_queue_timed_pop(gen_cnode_state->parentQueue, &tmo);
+        cb = (gen_cnode_callback_t*)g_async_queue_timeout_pop(gen_cnode_state->parentQueue, 1000);
         if( cb ){
             gen_cnode_handle_callback(cb, gen_cnode_state);    
         } 
@@ -486,7 +482,6 @@ bool gen_cnode_msg2cb( char* msg,
 
 int gen_cnode_handle_outgoing( gen_cnode_state_t* state ){
     int rc = 0;
-    GTimeVal tmo;
     gen_cnode_event_t* event = NULL;
     ei_x_buff msg = {0}; 
 
@@ -495,8 +490,7 @@ int gen_cnode_handle_outgoing( gen_cnode_state_t* state ){
     while( state->running ){
 
         //Wait a bit for an event, if none loop
-        g_get_current_time(&tmo), g_time_val_add(&tmo, 100);
-        if( (event = ((gen_cnode_event_t*)g_async_queue_timed_pop(state->eventQueue, &tmo))) ){
+        if( (event = ((gen_cnode_event_t*)g_async_queue_timeout_pop(state->eventQueue, 100))) ){
              
             //Attempt to allocate space for an ei_x_buff
             if( ei_x_new(&msg) ){
