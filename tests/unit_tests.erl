@@ -1,7 +1,5 @@
 -module( unit_tests ).
 
--import( gen_cnode ).
-
 -export( [ start/0,
            stop/0,
            callrate/1,
